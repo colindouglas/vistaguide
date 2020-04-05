@@ -1,7 +1,7 @@
 import keyring
 import viewpoint as vp
 
-
+# Get username
 with open('.username', 'r') as file:
     username = file.read()
 
@@ -19,3 +19,6 @@ path = vp.next_filename("data/listings_")
 
 # Scrape all of the data from the opened index
 vp.scrape_all(session, out=path)
+
+# Close everything at the end
+session.quit()

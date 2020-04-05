@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.common import exceptions as sce
 from datetime import datetime
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
@@ -80,12 +81,15 @@ def open_listing(driver, button):
 
 def read_listing(driver, out='data/listings.csv'):
     # Run the listing page source through beautiful soup
-    listing = BeautifulSoup(driver.page_source, 'lxml')
+    listing = BeautifulSoup(driver.page_source, 'html.parser')
+    title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()  # Take "ViewPoint.ca" out of the title
+    print('Scraping <{0}>...'.format(title))
+    desc = listing.find("div", {"class": "row-fluid printsmall"}).text.strip()
+    url = driver.current_url
 
     # Record the time and the title of the window (which contains address and postal code)
-    listing_row = [str(datetime.now()), listing.title.text, driver.current_url]
+    listing_row = [str(datetime.now()), title, url, desc]
 
-    print('Scraping listing...')
     for i, line in enumerate(listing.find_all('li', {'class': 'row'})):
         lines = ' '.join(list(str(line.text).split()))
         listing_row.append(lines)
@@ -94,62 +98,50 @@ def read_listing(driver, out='data/listings.csv'):
     # Append the list to the output file 'out'
     with open(out, 'a') as file:
         file.write('\t'.join(listing_row))
-    random_wait('Scraped <{0}>'.format(listing_row[1]), 5)
+    random_wait('Finished scraping', 5)
 
 
 def scrape_all(driver, out='data/listings.csv', handle=None):
+
+    current_page = 1  # Page counter
+    next = True  # Next button
+
+    # Store which window is the index window
+    # If the function had a handle argument, use that
+    # Otherwise use the window with focus
     if handle is None:
         index_window = driver.current_window_handle
     else:
         index_window = str(handle)
 
-    # Download the first page
-    first_page = BeautifulSoup(driver.page_source, 'lxml')
-
-    # Figure out how many listings there are total
-    # Because of the way the page loads, the source has many hidden "1 to 10 of X"
-    # The last one in the list is relevant
-    listing_count = re.findall('Showing 1 to [0-9]+ of [0-9]+', first_page.text)[-1].split()[-1]
-    if listing_count:
-        listing_count = int(listing_count)
-    else:
-        listing_count = 0
-
-    # Count the total pages
-    total_pages = listing_count // 10 + 1
-    current_page = 1
-
-    print('Found {n} total listings across {tp} pages'.format(n=listing_count, tp=total_pages))
-
     # Go through all of the properties on this page of this page of the index and scrape them
-    while current_page <= total_pages:
-
+    while bool(next):
         # Find all the different properties on the index page by matching
         properties = list()
         button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
         for button_string in button_strings:
             properties = properties + driver.find_elements_by_partial_link_text(button_string)
-        random_wait('Found {n} links on page {p}/{tp}'.format(n=len(properties),
-                                                            p=current_page,
-                                                            tp=total_pages),
-                    5)
+        random_wait('Found {n} links on page {p}'.format(n=len(properties),
+                                                            p=current_page
+                                                         ), 5)
 
         # Click on each of the buttons and scrape the resulting data
         for i, property in enumerate(properties):
-            random_wait('Starting property {p} on page {page}'.format(p=i+1, page=current_page), 2)
+            random_wait('Starting property #{p} on page {page}'.format(p=i+1, page=current_page), 2)
             open_listing(driver, property)
             read_listing(driver, out=out)
             driver.close()
-            random_wait('Finished with property {p} on page {page}'.format(p=i+1, page=current_page), 5)
+            random_wait('Finished with property #{p} on page {page}'.format(p=i+1, page=current_page), 5)
             driver.switch_to.window(index_window)
             random_wait('Switched to index window', 2)
 
         # Switch back to the index window
         driver.switch_to.window(index_window)
 
-        # Click on the next button if we're not on the last page
-        if current_page < total_pages:
-            driver.find_element_by_link_text('NEXT »').click()
+        # Check if there's a next button, and click on it if it exists
+        next = next_button(driver)
+        if bool(next):
+            next.click()
             current_page += 1
             random_wait('Switching to page {page}'.format(page=current_page), 5)
         else:  # If we're on the last page, print a message and stop
@@ -164,5 +156,13 @@ def next_filename(base):
         path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
     return path
 
-#TODO Close window at end
-#TODO Scrape description as well
+
+# Check if there's a next button on this page
+# Return the button object if it exists, otherwise false
+def next_button(driver):
+    try:
+        out = driver.find_element_by_link_text('NEXT »')
+    except sce.NoSuchElementException:
+        out = False
+        random_wait('No next button detected. Must be done!')
+    return out
