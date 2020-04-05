@@ -1,0 +1,10 @@
+*.log
+__*
+/venv/
+/data
+.username
+.Rproj.user
+*.Rproj
+.Rhistory
+.idea
+.Rproj.user
