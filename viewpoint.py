@@ -1,6 +1,7 @@
 from selenium import webdriver
 from datetime import datetime
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
 import re
 import time
@@ -27,16 +28,16 @@ def login(username, password):
     # Start firefox, accept the login URL
     driver = webdriver.Firefox(profile)
     driver.maximize_window()
-    random_wait('Open window', 5)
+    random_wait('Starting Firefox', 5)
     driver.get(LOGIN_URL)
-    random_wait('Open login window', 2)
+    random_wait('Opening Viewpoint login', 2)
 
     # Fill in username and password and click on the button
     driver.find_element_by_name('email').send_keys(username)
     driver.find_element_by_name('password').send_keys(password)
     driver.find_element_by_class_name('big').click()
-    random_wait('Logging in', 5)
-    return(driver)
+    random_wait('Logging in to Viewpoint', 5)
+    return driver
 
 
 # A function to click on a property 'button' (found via Selenium) and change focus to the popup
@@ -47,36 +48,43 @@ def open_listing(driver, button):
     index_window = driver.current_window_handle
 
     # Click on the button to open the window
-    button.click()
-    random_wait('Clicked on property button', 5)
+    # button.click()
+    # random_wait('Clicked on property button', 5)
 
-    # Switch focus to newly open window
-    new_window = list({x for x in driver.window_handles} - {index_window})[0]
-    driver.switch_to.window(new_window)
-    random_wait('Switched to window', 3)
+    # Shift click in the button
+    ActionChains(driver).key_down(Keys.SHIFT).click(button).key_up(Keys.SHIFT).perform()
+    random_wait('Shift+clicked on property button', 5)
+
+    # If there's a newly opened window, switch to it
+    new_window = list({x for x in driver.window_handles} - {index_window})
+    if new_window:
+        driver.switch_to.window(new_window[0])
+        random_wait('Switched to window', 3)
 
     # Click on the print button
     driver.find_element_by_class_name('cutsheet-print').click()
     random_wait('Clicked on print button', 2)
 
-    # Close the pretty-but-hard-to-scrape window
+    # If the index is opening popup windows, close the 'pretty' window
     driver.close()
     random_wait('Closed pretty window', 2)
+
+
 
     # Switch context to the printable page
     new_window = list({x for x in driver.window_handles} - {index_window})[0]
     driver.switch_to.window(new_window)
-    random_wait('Switched to printable window', 2)
+    random_wait('Switched to printable window', 5)
 
 
 def read_listing(driver, out='data/listings.csv'):
     # Run the listing page source through beautiful soup
-    listing = BeautifulSoup(driver.source, 'lxml')
+    listing = BeautifulSoup(driver.page_source, 'lxml')
 
     # Record the time and the title of the window (which contains address and postal code)
     listing_row = [str(datetime.now()), listing.title.text, driver.current_url]
 
-    print('Scraping', listing_row[1])
+    print('Scraping listing...')
     for i, line in enumerate(listing.find_all('li', {'class': 'row'})):
         lines = ' '.join(list(str(line.text).split()))
         listing_row.append(lines)
@@ -85,7 +93,7 @@ def read_listing(driver, out='data/listings.csv'):
     # Append the list to the output file 'out'
     with open(out, 'a') as file:
         file.write('\t'.join(listing_row))
-    random_wait('Scraped {0}'.format(listing_row[1]), 5)
+    random_wait('Scraped <{0}>'.format(listing_row[1]), 5)
 
 
 def scrape_all(driver, out='data/listings.csv', handle=None):
@@ -98,9 +106,11 @@ def scrape_all(driver, out='data/listings.csv', handle=None):
     first_page = BeautifulSoup(driver.page_source, 'lxml')
 
     # Figure out how many listings there are total
-    listing_count = re.search('[0-9]+', first_page.span.text)
+    # Because of the way the page loads, the source has many hidden "1 to 10 of X"
+    # The last one in the list is relevant
+    listing_count = re.findall('Showing 1 to [0-9]+ of [0-9]+', first_page.text)[-1].split()[-1]
     if listing_count:
-        listing_count = int(listing_count.group())
+        listing_count = int(listing_count)
     else:
         listing_count = 0
 
@@ -108,21 +118,30 @@ def scrape_all(driver, out='data/listings.csv', handle=None):
     total_pages = listing_count // 10 + 1
     current_page = 1
 
+    print('Found {n} total listings across {tp} pages'.format(n=listing_count, tp=total_pages))
+
     # Go through all of the properties on this page of this page of the index and scrape them
     while current_page <= total_pages:
-        # A list of all the 'property buttons' on the page
-        properties = driver.find_elements_by_partial_link_text('Entered')
+
+        # Find all the different properties on the index page by matching
+        properties = list()
+        button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
+        for button_string in button_strings:
+            properties = properties + driver.find_elements_by_partial_link_text(button_string)
+        random_wait('Found {n} links on page {p}/{tp}'.format(n=len(properties),
+                                                            p=current_page,
+                                                            tp=total_pages),
+                    5)
 
         # Click on each of the buttons and scrape the resulting data
         for i, property in enumerate(properties):
-            driver.switch_to.window(index_window)
-            random_wait('Switched to index window', 2)
+            random_wait('Starting property {p} on page {page}'.format(p=i+1, page=current_page), 2)
             open_listing(driver, property)
-            print('Opened property window')
             read_listing(driver, out=out)
-            print('Read listing')
             driver.close()
             random_wait('Finished with property {p} on page {page}'.format(p=i+1, page=current_page), 5)
+            driver.switch_to.window(index_window)
+            random_wait('Switched to index window', 2)
 
         # Switch back to the index window
         driver.switch_to.window(index_window)
