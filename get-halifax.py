@@ -1,7 +1,9 @@
 import keyring
 import viewpoint as vp
 
-username = 'colindouglas@gmail.com'
+
+with open('.username', 'r') as file:
+    username = file.read()
 
 # Login to Viewpoint, start a Selenium session
 session = vp.login(
@@ -17,5 +19,9 @@ vp.random_wait('Opening Saved Searches index', 3)
 session.find_element_by_partial_link_text('Halifax in the Last Week').click()
 vp.random_wait('Opening relevant saved search', 3)
 
-# Scrape all of the links from the 'New Today' index
-vp.scrape_all(session, out='data/listings.csv')
+# Find the next available filename
+path = vp.next_filename("data/listings_")
+
+# Scrape all of the data from the opened index
+vp.scrape_all(session, out=path)
+

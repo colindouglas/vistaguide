@@ -5,6 +5,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
 import re
 import time
+import os
 from numpy import random as npr
 
 # Function to randomly wait while printing a message about why it's waiting
@@ -154,3 +155,14 @@ def scrape_all(driver, out='data/listings.csv', handle=None):
         else:  # If we're on the last page, print a message and stop
             print('All finished after page', current_page)
             break
+
+def next_filename(base):
+    i = 0
+    path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
+    while os.path.exists(path):
+        i += 1
+        path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
+    return path
+
+#TODO Close window at end
+#TODO Scrape description as well
