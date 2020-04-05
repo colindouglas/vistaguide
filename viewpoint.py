@@ -78,7 +78,9 @@ def open_listing(driver, button):
     driver.switch_to.window(new_window)
     random_wait('Switched to printable window', 5)
 
-
+# This is the function that does all of the scraping and writes it to the path in 'out'
+# The first argument is a Selenium driver that is currently focused on a the "Print"
+# view of a listing. The print view is much easier to scrape than the initial view
 def read_listing(driver, out='data/listings.csv'):
     # Run the listing page source through beautiful soup
     listing = BeautifulSoup(driver.page_source, 'html.parser')
@@ -100,9 +102,10 @@ def read_listing(driver, out='data/listings.csv'):
         file.write('\t'.join(listing_row))
     random_wait('Finished scraping', 5)
 
-
+# This function goes through the listings in an index and scrapes them all and writes to the path in 'out'
+# The first argument (driver) should be a Selenium driver that is currently focused on the index
+# of a search or a dashboard. Pagination is handled in here as well.
 def scrape_all(driver, out='data/listings.csv', handle=None):
-
     current_page = 1  # Page counter
     next = True  # Next button
 
@@ -148,6 +151,9 @@ def scrape_all(driver, out='data/listings.csv', handle=None):
             print('All finished after page', current_page)
             break
 
+
+# Finds the next unused filename with the format baseYYYMMDDI.csv
+# e.g., listing-202004051.csv for the second output of April 5, 2020
 def next_filename(base):
     i = 0
     path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
@@ -158,7 +164,7 @@ def next_filename(base):
 
 
 # Check if there's a next button on this page
-# Return the button object if it exists, otherwise false
+# Return the button object if it exists, otherwise return false
 def next_button(driver):
     try:
         out = driver.find_element_by_link_text('NEXT »')
