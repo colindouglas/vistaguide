@@ -4,7 +4,9 @@ library(lubridate)
 # For x = 'prefix: data' return 'data'
 drop_prefix <- function(x, prefix) {
   out <- str_replace(x, prefix, '') %>% str_trim() %>% pluck(1)
-  if (out == '' | out == "N/A") out <- NA
+  if (out == 'Yes') out <- TRUE
+  if (out == 'No') out <- FALSE
+  if (out == '' | out == "N/A" | out == "None") out <- NA
   return(out)
 }
 
@@ -41,6 +43,12 @@ parse_row <- function(row) {
   out$postal <- str_extract(out$address, '[A-Za-z]\\d[A-Za-z][ -]?\\d[A-Za-z]\\d')
   out$address <- str_replace(out$address, paste(',', out$postal), '')
   
+  # If there's no space in the postal code, add one
+  out$postal[
+    (nchar(out$postal) == 6 & !grepl(" ", out$postal)) # Without a space in between
+    ] <- paste(substring(out$postal, 1, 3), substring(out$postal, 4, 6))
+  
+  
   # Deal with the URL and the description, which are always in the same position
   out$url <- row[3]
   out$description <- row[4]
@@ -49,6 +57,7 @@ parse_row <- function(row) {
   # Therefore we need to test to see which field it is before parsing
   
   # This is a list of fields that are expected to return factors/character strings
+  # This needs to match the prefix exactly (missing whitespace is OK) because it is regex'd out
   field_shortcodes_fct <- c(
     "Sewer:" = "sewer", 
     "Water:" = "water",
@@ -71,7 +80,7 @@ parse_row <- function(row) {
     "Foundation:" = "foundation",
     "Basement:" = "basement",
     "Driveway/Pkg:" = "driveway",
-    "Utilities" = "utilities",
+    "Utilities:" = "utilities",
     "Features:" = "features",
     "Roof:" = "roof",
     "Flooring:" = "flooring",
@@ -85,6 +94,7 @@ parse_row <- function(row) {
     "Compliments of:" = "compliments_of")
   
   # This is a list of fields that are expected to return numerics
+  # They don't need to match the prefix exactly beccause the number is extracted from them
   field_shortcodes_num <- c(
     "Sq. Footage" = "sqft_mla",
     "Total Fin Sq. Footage" = "sqft_tla",
@@ -152,12 +162,12 @@ listings <- map_dfr(rows, ~ parse_row(.))
 
 listings_u <- listings %>%
   # Keep only the unique rows, because sometimes things get posted more than once
-  distinct(address, url, date = as_date(datetime), price, status, .keep_all = TRUE) %>%
+  distinct(mls_no, date = as_date(datetime), price, status, .keep_all = TRUE) %>%
   select(-date) %>%
   # Split the postal code up for easier analysis
   separate(postal, 
            into = c("postal_first", "postal_last"), 
-           sep = " ", remove = FALSE) %>%
+           sep = " |\\-", remove = FALSE) %>%
   # Put the unit numbers for apartments/condos into their own column, take it out of the address
   mutate(
     unit = case_when(
@@ -168,8 +178,6 @@ listings_u <- listings %>%
   # Split the address into a street and a city
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
     
-    
-
 # Where to write the output file
 todays_date <- format(Sys.Date(), format = "%Y%m%d")
 path_out <- paste0("data/listings-clean_", todays_date, ".csv")

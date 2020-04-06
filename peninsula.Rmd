@@ -1,0 +1,48 @@
+---
+title: "Halifax Listings"
+author: "Colin Douglas"
+date: "06/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+listings <- read_csv("data/listings-clean_20200406.csv")
+
+```
+
+## R Markdown
+
+```{r cars}
+peninsula_codes <- c("B3H" = "South End", 
+                     "B3J" = "Downtown", 
+                     "B3K" = "North End", 
+                     "B3L" = "West End")
+
+listings %>%
+  filter(postal_first %in% names(peninsula_codes), city == "Halifax") %>% 
+  ggplot(aes(x = sqft_mla, y = price)) +
+  #geom_point(aes(color = substring(postal_first, 1, 2))) +
+  geom_point(aes(color = postal_first)) +
+  #labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
+  labs(color = "", x = "", y = "") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_color_discrete(labels = peninsula_codes)
+
+listings %>%
+  ggplot(aes(x = postal_first)) +
+  geom_bar()
+  
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

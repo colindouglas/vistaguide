@@ -23,7 +23,7 @@ def wait(message: chr = '', mean: float = 2, sd: float = 1) -> None:
 
 # Finds the next unused filename with the format baseYYYMMDDI.csv
 # e.g., listing-202004051.csv for the second output of April 5, 2020
-def next_filename(base):
+def next_filename(base: chr = 'listing_') -> chr:
     i = 0
     path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
     while os.path.exists(path):
@@ -42,7 +42,7 @@ class Viewpoint(webdriver.Firefox):
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
 
-        # Init the webdirver with the Firefox profile defined above
+        # Init the webdriver with the Firefox profile defined above
         super().__init__(profile)
         # Start firefox, accept the login URL
         self.maximize_window()
