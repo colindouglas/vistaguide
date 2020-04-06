@@ -23,7 +23,7 @@ session.find_element_by_link_text('SAVED SEARCHES').click()
 vp.wait('Opening Saved Searches index', 3)
 
 # Open the previously saved 'Halifax in the Last Week' search
-session.find_element_by_partial_link_text('Everything WithinDay AnyStatus').click()
+session.find_element_by_partial_link_text('Everything WithinDay').click()
 vp.wait('Opening relevant saved search', 3)
 
 # Scrape all of the data from the opened index
