@@ -17,7 +17,9 @@ def wait(message: chr = '', mean: float = 2, sd: float = 1) -> None:
     wt = npr.normal(loc=mean, scale=sd)
     if wt < 0.5:
         wt = 1 - wt
-    print('Waiting for {:.1f} secs: {message}'.format(wt, message=message))
+    print('[{dt}] Waiting for {:.1f} secs: {message}'.format(wt,
+                                                             message=message,
+                                                             dt=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     time.sleep(wt)
     return None
 
@@ -39,11 +41,12 @@ class Viewpoint(webdriver.Firefox):
     def __init__(self, username, password, headless=True):
 
         # Set a Firefox profile so the print window doesn't mess things up
+        # I'm not sure if this is necessary in headless mode but it doesn't break it so whatever
         profile = webdriver.FirefoxProfile()
         profile.set_preference("print.always_print_silent", True)
         profile.set_preference("print.show_print_progress", False)
 
-        # Run Firefox headless so it can run in the background
+        # Run Firefox headless so it can hide in the background
         options = Options()
         if headless:
             options.headless = True
