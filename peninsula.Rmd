@@ -9,40 +9,51 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 
-listings <- read_csv("data/listings-clean_20200406.csv")
+listings <- read_csv("data/listings-clean_20200407.csv")
 
 ```
 
-## R Markdown
-
-```{r cars}
+## Price per Area on the Peninsula
+```{r Price per Area on vs. Off, fig.width=10, fig.height=3}
 peninsula_codes <- c("B3H" = "South End", 
                      "B3J" = "Downtown", 
                      "B3K" = "North End", 
                      "B3L" = "West End")
 
+
+
 listings %>%
-  filter(postal_first %in% names(peninsula_codes), city == "Halifax") %>% 
+  mutate(
+    peninsula = factor(
+      case_when(
+        postal_first %in% names(peninsula_codes) ~ "On Peninsula",
+        substring(postal_first, 1, 2) %in% c("B2", "B3") ~ "In HRM, Off Peninsula",
+        TRUE ~ "Outside HRM"), 
+      levels = c("Outside HRM", "In HRM, Off Peninsula", "On Peninsula"))) %>%
   ggplot(aes(x = sqft_mla, y = price)) +
-  #geom_point(aes(color = substring(postal_first, 1, 2))) +
-  geom_point(aes(color = postal_first)) +
-  #labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
-  labs(color = "", x = "", y = "") +
-  scale_y_continuous(labels = scales::comma) +
-  scale_color_discrete(labels = peninsula_codes)
+  geom_point(aes(color = type), na.rm = TRUE) +
+  labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
+  facet_wrap(~ peninsula) +
+  scale_y_continuous(labels = scales::dollar, breaks = seq(0, 1E7, by = 2E5))+
+  geom_smooth(method = "lm", formula = y ~ x, color = "darkgrey", na.rm = TRUE)
+
+```
+
+
+## Where are the Listings?
+
+```{r where are the listings}
+
+postal_order <- listings %>% 
+  count(postal_first) %>%
+  arrange(-n) %>%
+  pull(postal_first)
 
 listings %>%
+  mutate(postal_first = factor(postal_first, levels = postal_order)) %>%
   ggplot(aes(x = postal_first)) +
-  geom_bar()
-  
+  geom_bar(aes(fill = substring(postal_first, 1, 2))) +
+  scale_y_continuous(breaks = seq(0, 50, by = 2)) +
+  scale_fill_discrete(name = '', guide = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) 
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

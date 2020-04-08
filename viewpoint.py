@@ -3,6 +3,7 @@ from selenium.common import exceptions as sce
 from datetime import datetime
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.firefox.options import Options
 from bs4 import BeautifulSoup
 import re
 import time
@@ -35,18 +36,29 @@ def next_filename(base: chr = 'listing_') -> chr:
 class Viewpoint(webdriver.Firefox):
     # Function to start the web scraper and login with a username and password
     # Returns the Selenium driver object, which gets passed to subsequent functions
-    def __init__(self, username, password):
+    def __init__(self, username, password, headless=True):
+
+        # Set a Firefox profile so the print window doesn't mess things up
         profile = webdriver.FirefoxProfile()
         profile.set_preference("print.always_print_silent", True)
         profile.set_preference("print.show_print_progress", False)
 
+        # Run Firefox headless so it can run in the background
+        options = Options()
+        if headless:
+            options.headless = True
+
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
 
-        # Init the webdriver with the Firefox profile defined above
-        super().__init__(profile)
-        # Start firefox, accept the login URL
-        self.maximize_window()
+        # Init the webdriver with the options and Firefox profile defined above
+        super().__init__(profile, options=options)
+
+        # Set the window larger so everything stays on screen
+        self.set_window_position(0, 0)
+        self.set_window_size(1920, 1080)
         wait('Starting Firefox', 5)
+
+        # Open the login URL and log in
         self.get(_LOGIN_URL)
         wait('Opening Viewpoint login', 2)
 
