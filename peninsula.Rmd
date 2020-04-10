@@ -8,33 +8,51 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(lubridate)
 
-listings <- read_csv("data/listings-clean_20200407.csv")
+listings <- read_csv("data/listings-clean.csv")
+
+fsa_ns <- read_csv("canada_fsa.csv")  %>%
+  select(fsa = FSA, place_name = `Place Name`, province = `FSA-Province`, area_type = AreaType) %>%
+  filter(province == 12, !is.na(place_name)) %>%
+  distinct()
 
 ```
 
 ## Price per Area on the Peninsula
-```{r Price per Area on vs. Off, fig.width=10, fig.height=3}
+```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
 peninsula_codes <- c("B3H" = "South End", 
                      "B3J" = "Downtown", 
                      "B3K" = "North End", 
                      "B3L" = "West End")
 
+dartmouth_codes <- c(paste0("B2", c("T", "V", "W", "X", "Y", "Z")),
+                     paste0("B3", c("A", "B")))
+hrm_codes       <- c(paste0("B3", c("M", "N", "P", "R", "S", "T", "V", "Z")),
+                     paste0("B4", c("A", "B", "C", "E", "G")))
 
-
-listings %>%
-  mutate(
-    peninsula = factor(
+hrm_vs_other <- listings %>%
+  filter(price < 1E6, sqft_mla < 4000, # Nothing too fancy, thanks
+         type %in% c("Single Family", "Condominium"),
+         (!is.na(list_date) & ymd(list_date) > ymd("2020-04-01"))) %>%  # Only recent listings
+  mutate(loc_bin = factor(
       case_when(
-        postal_first %in% names(peninsula_codes) ~ "On Peninsula",
-        substring(postal_first, 1, 2) %in% c("B2", "B3") ~ "In HRM, Off Peninsula",
+        postal_first %in% names(peninsula_codes) ~ "Halifax Peninsula",
+        postal_first %in% dartmouth_codes ~ "Dartmouth",
+        postal_first %in% hrm_codes ~ "HRM excl. Penin. + Dart.",
         TRUE ~ "Outside HRM"), 
-      levels = c("Outside HRM", "In HRM, Off Peninsula", "On Peninsula"))) %>%
+      levels = c("Halifax Peninsula", "Dartmouth", "HRM excl. Penin. + Dart.", "Outside HRM")))
+
+hrm_vs_other %>%
   ggplot(aes(x = sqft_mla, y = price)) +
-  geom_point(aes(color = type), na.rm = TRUE) +
+  geom_point(aes(color = yday(ymd(list_date))), na.rm = TRUE) +
   labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
-  facet_wrap(~ peninsula) +
-  scale_y_continuous(labels = scales::dollar, breaks = seq(0, 1E7, by = 2E5))+
+  facet_grid(loc_bin ~ type) +
+  scale_color_viridis_c(option = "plasma", 
+                        direction = -1,
+                        # breaks = unique(yday(ymd(listings$list_date))),
+                        name = "List Date (DoY)") +
+  scale_y_continuous(labels = scales::dollar) +
   geom_smooth(method = "lm", formula = y ~ x, color = "darkgrey", na.rm = TRUE)
 
 ```

@@ -1,17 +1,17 @@
-import keyring
+from configparser import ConfigParser
 import viewpoint as vp
 
-# What username to login with?
-with open('.username', 'r') as file:
-    username = file.read()
+# Read credentials from config file (./config.txt)
+config = ConfigParser('config.txt')
+config.read('config.txt')
 
 # Find the next available filename
 path = vp.next_filename("data/listings_")
 
 # Log into ViewPoint
 session = vp.Viewpoint(
-    username=username,
-    password=keyring.get_password("viewpoint", username)
+    username=config['credentials']['username'],
+    password=config['credentials']['password']
 )
 
 # Open the Dashboard for a text list

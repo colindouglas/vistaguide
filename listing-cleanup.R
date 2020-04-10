@@ -12,7 +12,7 @@ drop_prefix <- function(x, prefix) {
 
 # For x with a price listed as $1,000,000.00, return 1000000
 extract_money <- function(x) {
-  x %>% 
+  x %>%
     str_extract('\\$\\d*,?\\d*,*\\d+') %>%
     str_replace_all(",|\\$", '') %>%
     as.numeric()
@@ -20,7 +20,7 @@ extract_money <- function(x) {
 
 # For x with a value listed as 1,000,000.00, return 1000000
 extract_number <- function(x) {
-  x %>% 
+  x %>%
     str_extract('\\d*,?\\d*,*\\d+\\.*\\d*') %>%
     str_replace_all(",", '') %>%
     as.numeric()
@@ -28,38 +28,38 @@ extract_number <- function(x) {
 
 # Open all of the files that match listing_ddddddddd.csv in the folder, bind them together
 files <- list.files('data/', pattern = "(listings)_[0-9]{9}\\.csv", full.names = TRUE)
-raw_rows <- suppressWarnings(map_dfr(files, ~ read_tsv(., col_names = FALSE)))
+raw_rows <- suppressWarnings(map_dfr(files, ~ read_tsv(., col_names = FALSE, col_types = cols())))
 
 
 # Function to parse the not-necessarily-ordered fields in a row
 parse_row <- function(row) {
   row <- as.character(row) # Convert everything to chr so we don't get NAs
   out <- list()
-  
+
   out$datetime <- as_datetime(as.numeric(row[1]))
-  
+
   # Split the "address" field into the street address and the postal code
   out$address <- row[2]
   out$postal <- str_extract(out$address, '[A-Za-z]\\d[A-Za-z][ -]?\\d[A-Za-z]\\d')
   out$address <- str_replace(out$address, paste(',', out$postal), '')
-  
+
   # If there's no space in the postal code, add one
   out$postal[
     (nchar(out$postal) == 6 & !grepl(" ", out$postal)) # Without a space in between
     ] <- paste(substring(out$postal, 1, 3), substring(out$postal, 4, 6))
-  
-  
+
+
   # Deal with the URL and the description, which are always in the same position
   out$url <- row[3]
   out$description <- row[4]
-  
+
   # Everything from here down is not always in the same position in the row
   # Therefore we need to test to see which field it is before parsing
-  
+
   # This is a list of fields that are expected to return factors/character strings
   # This needs to match the prefix exactly (missing whitespace is OK) because it is regex'd out
   field_shortcodes_fct <- c(
-    "Sewer:" = "sewer", 
+    "Sewer:" = "sewer",
     "Water:" = "water",
     "Lising Size:" = "listing_size",
     "Heating:" = "heating",
@@ -68,7 +68,7 @@ parse_row <- function(row) {
     "Sewer:" = "sewar",
     "Status:" = "status",
     "MLS® #" =  "mls_no",
-    "PID" = "pid", 
+    "PID" = "pid",
     "Lot Size" = "lot_size",
     "Listed By" = "agent",
     "Garage Type:" = "garage_type",
@@ -92,7 +92,7 @@ parse_row <- function(row) {
     "Jr High School:" = "school_jrhigh",
     "High School:" = "school_high",
     "Compliments of:" = "compliments_of")
-  
+
   # This is a list of fields that are expected to return numerics
   # They don't need to match the prefix exactly beccause the number is extracted from them
   field_shortcodes_num <- c(
@@ -103,19 +103,19 @@ parse_row <- function(row) {
     "Bathrooms:" = "bathrooms",
     "Building Age:" = "building_age"
   )
-  
+
   field_regex_num <- paste(names(field_shortcodes_num), collapse = "|")
   field_regex_fct <- paste(names(field_shortcodes_fct), collapse = "|")
-  
+
   # Loop through each column in the row and apply the appropriate formating
   for (field in tail(row, -4)) {
-    
+
     # Handle the 'Price' field by extracting the number, removing commas
     if (grepl("Price", field)) {
       out$price <- extract_money(field)
     }
-    
-    # Parse out the assessment. This requires special treatment because 
+
+    # Parse out the assessment. This requires special treatment because
     # we need to get the year and the dollar value out of it
     if (grepl("Assessment", field)) {
       out$assessment <- extract_money(field)
@@ -124,25 +124,25 @@ parse_row <- function(row) {
         str_replace_all('\\(|\\)', '') %>%
         as.numeric()
     }
-    
+
     if (grepl("Condo Fee", field)) {
       out$condo_fee <- extract_money(field)
     }
-    
+
     # Parse out the listing date. This needs special treatment
     # because we have to turn it into a date and calculate days on the market
     if (grepl("List Date", field)) {
       out$list_date <- ymd(str_extract(field, "20\\d{2}-\\d{2}-\\d{2}"))
       out$days_on_market <- as_date(out$datetime) - out$list_date
     }
-    
+
     # Handle fields that are factors
     if (grepl(field_regex_fct, field)) {
       field_name <- str_extract(field, field_regex_fct)
       field_short <- field_shortcodes_fct[field_name]
       out[[field_short]] = drop_prefix(field, prefix = field_name)
     }
-    
+
     # Handle fields that are numeric
     if (grepl(field_regex_num, field)) {
       field_name <- str_extract(field, field_regex_num)
@@ -165,8 +165,8 @@ listings_u <- listings %>%
   distinct(mls_no, date = as_date(datetime), price, status, .keep_all = TRUE) %>%
   select(-date) %>%
   # Split the postal code up for easier analysis
-  separate(postal, 
-           into = c("postal_first", "postal_last"), 
+  separate(postal,
+           into = c("postal_first", "postal_last"),
            sep = " |\\-", remove = FALSE) %>%
   # Put the unit numbers for apartments/condos into their own column, take it out of the address
   mutate(
@@ -177,12 +177,11 @@ listings_u <- listings %>%
     ) %>%
   # Split the address into a street and a city
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
-    
+
 # Where to write the output file
 todays_date <- format(Sys.Date(), format = "%Y%m%d")
-path_out <- paste0("data/listings-clean_", todays_date, ".csv")
+# path_out <- paste0("data/listings-clean_", todays_date, ".csv")
+path_out <- paste0("data/listings-clean.csv")
 
 # Write the file
 write_csv(listings_u, path = path_out, na = "")
-
-          

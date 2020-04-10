@@ -54,7 +54,9 @@ class Viewpoint(webdriver.Firefox):
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
 
         # Init the webdriver with the options and Firefox profile defined above
-        super().__init__(profile, options=options)
+        super().__init__(profile,
+                         options=options,
+                         log_path='logs/geckodriver.log')
 
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
