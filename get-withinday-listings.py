@@ -2,7 +2,7 @@ from configparser import ConfigParser
 import viewpoint as vp
 
 # Read credentials from config file (./config.txt)
-config = ConfigParser('config.txt')
+config = ConfigParser()
 config.read('config.txt')
 
 # Find the next available filename
