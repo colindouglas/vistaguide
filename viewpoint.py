@@ -52,11 +52,17 @@ class Viewpoint(webdriver.Firefox):
             options.headless = True
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
-
         # Init the webdriver with the options and Firefox profile defined above
-        super().__init__(profile,
-                         options=options,
-                         log_path='logs/geckodriver.log')
+        # If 'geckodriver' isn't in the path, just an explicitly location
+        try:
+            super().__init__(profile,
+                             options=options,
+                             log_path='logs/geckodriver.log')
+        except FileNotFoundError:
+            super().__init__(profile,
+                             executable_path='/usr/local/bin/geckodriver',
+                             options=options,
+                             log_path='logs/geckodriver.log')
 
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)

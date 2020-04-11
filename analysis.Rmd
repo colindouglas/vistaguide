@@ -1,0 +1,144 @@
+---
+title: "Halifax Listings"
+author: "Colin Douglas"
+date: "06/04/2020"
+output: 
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc/pandoc")
+library(tidyverse)
+library(lubridate)
+```
+
+```{r Read in data, define regions}
+
+listings <- read_csv("data/listings-clean.csv", col_types = cols())
+
+fsa_ns <- read_csv("data/canada_fsa.csv", col_types = cols())  %>%
+  filter(`FSA-Province` == 12) %>% # NS
+  select(postal = PostalCode, postal_city = `Place Name`, area_type = AreaType) %>%
+  mutate(postal = paste(substring(postal, 1, 3), substring(postal, 4, 6)))
+
+peninsula_codes <- c("B3H" = "South End", 
+                     "B3J" = "Downtown", 
+                     "B3K" = "North End", 
+                     "B3L" = "West End")
+
+hrm_places <- c("Halifax", "Dartmouth", "Bedford", "Lower Sackville", "Hammonds Plains", 
+                "Beaver Bank", "Timberlea", "Middle Sackville", "Upper Sackville")
+
+listings <- listings %>%
+  left_join(fsa_ns, by = "postal") %>%
+  mutate(peninsula = peninsula_codes[postal_first])
+
+```
+
+## Price per Square Foot Across the Province
+```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
+
+# Clean up the listings, bin each location into something meaningful
+hrm_vs_other <- listings %>%
+  filter(price < 1E6, sqft_mla < 4000, # Nothing too fancy, thanks
+         type %in% c("Single Family", "Condominium"),
+         !is.na(style),
+         (!is.na(list_date) & ymd(list_date) > ymd("2020-04-01"))) %>%  # Only recent listings
+  mutate(loc_bin = factor(
+    case_when(
+      postal_first %in% names(peninsula_codes) ~ "Halifax Peninsula",
+      postal_city == "Halifax" ~ "Halifax, Off Peninsula",
+      postal_city == "Dartmouth" ~ "Dartmouth",
+      postal_city %in% hrm_places ~ "HRM, Other",
+      TRUE ~ "Rest of Province"), 
+    levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
+
+# Fit each (location bin, type) to a linear model, extract the coefficients and make a pretty box for the graph
+sqft_fits <- hrm_vs_other %>%
+  group_by(loc_bin, style) %>%
+  do(fit = lm(.$price ~ .$sqft_mla)) %>%
+  mutate(slope = fit$coefficients[2],
+         intercept = fit$coefficients[1],
+         pretty = paste0("Base: ", scales::dollar(signif(intercept, 3)),
+                         ifelse(is.na(slope), "", paste("\nPer Sq. ft.: ", scales::dollar(signif(slope, 3))))))
+
+hrm_vs_other %>%
+  ggplot(aes(x = sqft_mla, y = price)) +
+  geom_label(data = sqft_fits, aes(label = pretty),
+             x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             size = 3) +
+  geom_point(aes(color = yday(ymd(list_date))), na.rm = TRUE) +
+  labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
+  facet_grid(loc_bin ~ type) +
+  scale_color_viridis_c(option = "plasma", 
+                        direction = -1,
+                        name = "List (DoY)") +
+  scale_y_continuous(labels = scales::dollar) +
+  geom_smooth(method = "lm", formula = y ~ x, na.rm = TRUE, color = "darkgrey")
+
+```
+
+## Where are the Listings?
+
+```{r where are the listings, fig.width = 8, fig.height = 6}
+
+top_20_cities <- listings %>% 
+  distinct(mls_no, .keep_all = TRUE) %>%
+  filter(!is.na(postal_city), 
+         !is.na(type),
+         status == "For Sale") %>%
+  count(postal_city) %>%
+  arrange(-n) %>%
+  head(20) %>%
+  pull(postal_city)
+
+listings %>%
+  filter(postal_city %in% top_20_cities,
+         !is.na(type),
+         status %in% c("For Sale", "Sold")) %>%
+  distinct(mls_no, .keep_all = TRUE) %>%
+  mutate(postal_city = factor(postal_city, levels = top_20_cities),
+         type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
+  ggplot(aes(x = postal_city)) +
+  geom_bar(aes(fill = type)) +
+  facet_wrap(~ status, ncol = 1) +
+  scale_fill_viridis_d(option = "plasma", name = "") +
+  scale_x_discrete(name = "") +
+  scale_y_continuous(name = "Listing Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+## When are they being listed?
+
+```{r By List Date}
+
+listings %>%
+  distinct(mls_no, .keep_all = TRUE) %>%
+  mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
+  filter(ymd(list_date) > ymd("2020-04-01"), 
+         status == "For Sale") %>%
+  ggplot(aes(x = ymd(list_date))) +
+  geom_bar(aes(fill = type), position = "stack", width = 0.9) +
+  scale_fill_viridis_d(option = "plasma", end = 8/9, name = "") +
+  xlab("List Date") +
+  scale_y_continuous(name = "Count")
+```
+
+## Real Estate Agents are Bad at Postal Codes
+
+In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
+
+```{r Check for messed up regions, rows.print = 20}
+listings %>%
+  filter(city != postal_city) %>%
+  count(city, postal_city) %>%
+  filter(n > 2) %>%
+  arrange(-n) %>%
+  rename(`Listing City` = city,
+         `City from Postal Code` = postal_city,
+         Count = n)
+```
+
+## Try to Fit a Big Dumb Model

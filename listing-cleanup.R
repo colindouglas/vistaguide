@@ -185,3 +185,6 @@ path_out <- paste0("data/listings-clean.csv")
 
 # Write the file
 write_csv(listings_u, path = path_out, na = "")
+
+# Update the analysis markdown
+rmarkdown::render("analysis.Rmd")
