@@ -161,9 +161,6 @@ listings <- map_dfr(rows, ~ parse_row(.))
 
 
 listings_u <- listings %>%
-  # Keep only the unique rows, because sometimes things get posted more than once
-  distinct(mls_no, date = as_date(datetime), price, status, .keep_all = TRUE) %>%
-  select(-date) %>%
   # Split the postal code up for easier analysis
   separate(postal,
            into = c("postal_first", "postal_last"),

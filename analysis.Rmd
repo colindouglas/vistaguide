@@ -5,18 +5,19 @@ date: "06/04/2020"
 output: 
   html_document:
     df_print: paged
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc/pandoc")
 library(tidyverse)
 library(lubridate)
 ```
+**Last Updated** `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 
 ```{r Read in data, define regions}
 
-listings <- read_csv("data/listings-clean.csv", col_types = cols())
+listings_all <- read_csv("data/listings-clean.csv", col_types = cols())
 
 fsa_ns <- read_csv("data/canada_fsa.csv", col_types = cols())  %>%
   filter(`FSA-Province` == 12) %>% # NS
@@ -29,13 +30,28 @@ peninsula_codes <- c("B3H" = "South End",
                      "B3L" = "West End")
 
 hrm_places <- c("Halifax", "Dartmouth", "Bedford", "Lower Sackville", "Hammonds Plains", 
-                "Beaver Bank", "Timberlea", "Middle Sackville", "Upper Sackville")
+                "Beaver Bank", "Timberlea", "Middle Sackville", "Upper Sackville",
+                "Lucasville", "Fall River", "Spryfield")
 
-listings <- listings %>%
+listings_all <- listings_all %>%
   left_join(fsa_ns, by = "postal") %>%
-  mutate(peninsula = peninsula_codes[postal_first])
+  mutate(peninsula = peninsula_codes[postal_first],
+         loc_bin = factor(
+           case_when(
+             postal_first %in% names(peninsula_codes) ~ "Halifax Peninsula",
+             postal_city == "Halifax" | city == "Halifax" ~ "Halifax, Off Peninsula",
+             postal_city == "Dartmouth" | city == "Dartmouth" ~ "Dartmouth",
+             postal_city %in% hrm_places | city %in% hrm_places ~ "HRM, Other",
+             TRUE ~ "Rest of Province"), 
+           levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
+
+listings <- listings_all %>%
+  # Keep only the unique rows, because sometimes things get posted more than once
+  distinct(mls_no, price, status, .keep_all = TRUE)
 
 ```
+
+This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The earliest point at which data was collected was `r as_date(min(listings$datetime, na.rm = TRUE))`, and the most recent listing was scraped on `r as_date(max(listings$datetime, na.rm = TRUE))`.
 
 ## Price per Square Foot Across the Province
 ```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
@@ -44,20 +60,12 @@ listings <- listings %>%
 hrm_vs_other <- listings %>%
   filter(price < 1E6, sqft_mla < 4000, # Nothing too fancy, thanks
          type %in% c("Single Family", "Condominium"),
-         !is.na(style),
-         (!is.na(list_date) & ymd(list_date) > ymd("2020-04-01"))) %>%  # Only recent listings
-  mutate(loc_bin = factor(
-    case_when(
-      postal_first %in% names(peninsula_codes) ~ "Halifax Peninsula",
-      postal_city == "Halifax" ~ "Halifax, Off Peninsula",
-      postal_city == "Dartmouth" ~ "Dartmouth",
-      postal_city %in% hrm_places ~ "HRM, Other",
-      TRUE ~ "Rest of Province"), 
-    levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
+         (!is.na(list_date) & ymd(list_date) > ymd("2020-04-01")))  # Only recent listings
+
 
 # Fit each (location bin, type) to a linear model, extract the coefficients and make a pretty box for the graph
 sqft_fits <- hrm_vs_other %>%
-  group_by(loc_bin, style) %>%
+  group_by(loc_bin, type) %>%
   do(fit = lm(.$price ~ .$sqft_mla)) %>%
   mutate(slope = fit$coefficients[2],
          intercept = fit$coefficients[1],
@@ -80,6 +88,49 @@ hrm_vs_other %>%
 
 ```
 
+## Single Family Homes in HRM
+
+```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
+
+period <- 30.4  # days
+
+price_sqft_fits <- hrm_vs_other %>%
+    filter(status %in% c("For Sale", "Sold"),
+           type == "Single Family") %>%
+  group_by(loc_bin, status) %>%
+  summarize(N = n(),
+            fit = list(lm(price/sqft_mla ~ as_date(list_date)))) %>%
+  mutate(slope = fit[[1]]$coefficients[2],
+         intercept = fit[[1]]$coefficients[1],
+         slope_stderr = ifelse(N > 2, summary(fit[[1]])$coefficients[2, 2], NA),
+         percent_change_yr = slope/intercept * period,
+         percent_change_stderr = 2 * slope_stderr/intercept * period,
+         pretty = case_when(
+           is.nan(slope_stderr) | is.na(slope_stderr) ~ as.character(NA),
+           abs(slope) < abs(2 * slope_stderr) ~ paste0("n.s. (", scales::dollar(round(slope * period), accuracy = NULL), ")"),
+           TRUE ~ paste("Δ/month:", 
+                               scales::dollar(round(slope * period), accuracy = NULL), 
+                               "±",
+                               round(slope_stderr*2 * period, 0))))
+
+hrm_vs_other %>%
+  filter(status %in% c("For Sale", "Sold"),
+         type == "Single Family") %>%
+  ggplot(aes(x = list_date, y = price/sqft_mla)) +
+  geom_point(alpha = 0.5, aes(color = substring(postal_first, 1, 2))) +
+  facet_grid(loc_bin ~ status, scales = "free_y") +
+  geom_smooth(method = "lm", formula = y~x, color = "darkgrey") +
+  labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
+  geom_label(data = price_sqft_fits, aes(label = pretty),
+             x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             size = 3) +
+  scale_color_viridis_d(option = "plasma", 
+                        direction = -1,
+                        name = "")
+  
+
+```
+
 ## Where are the Listings?
 
 ```{r where are the listings, fig.width = 8, fig.height = 6}
@@ -98,7 +149,7 @@ listings %>%
   filter(postal_city %in% top_20_cities,
          !is.na(type),
          status %in% c("For Sale", "Sold")) %>%
-  distinct(mls_no, .keep_all = TRUE) %>%
+  distinct(mls_no, status, .keep_all = TRUE) %>%
   mutate(postal_city = factor(postal_city, levels = top_20_cities),
          type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
   ggplot(aes(x = postal_city)) +
@@ -130,15 +181,81 @@ listings %>%
 
 In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
 
-```{r Check for messed up regions, rows.print = 20}
+### Postal Codes That Don't Exist
+
+```{r Postal codes that dont exist, rows.print = 10}
+listings %>%
+  filter(is.na(postal_city)) %>%
+  group_by(city) %>%
+  summarize(Count = n(),
+            `Postal Codes` = str_trunc(paste(postal, collapse = ", "), 70)) %>%
+  arrange(-Count) %>%
+  rename(`Listed City` = city)
+```
+### Postal Codes That Describe Somewhere Else
+
+
+```{r Check for messed up regions, rows.print = 10}
 listings %>%
   filter(city != postal_city) %>%
   count(city, postal_city) %>%
-  filter(n > 2) %>%
   arrange(-n) %>%
   rename(`Listing City` = city,
          `City from Postal Code` = postal_city,
-         Count = n)
+         Count = n) 
 ```
 
-## Try to Fit a Big Dumb Model
+## Price Changes vs. Status
+
+```{r Price Changes, fig.width = 8, fig.height = 8}
+listings_with_change <- listings %>%
+  filter(status != "Pending") %>%
+  group_by(pid) %>%
+  distinct(status, price, .keep_all = TRUE) %>%
+  filter(length(unique(status)) > 1) %>%
+  pull(pid)
+
+listings_all %>%
+  filter(pid %in% listings_with_change,
+         price < 1E6) %>%
+  ggplot(aes(x = as_date(datetime), y = price)) +
+  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
+  geom_point(aes(color = status), size = 4) +
+  scale_color_manual(values =
+                       c("For Sale" = "#3288bd", # Blue
+                         "Pending" =  "#fdae61", # Yellow
+                         "Sold" = "#5aae61", # Green
+                         "Withdrawn" = "#9e0142", # Dark Red
+                         "Cancelled" = "#d53e4f", # Less dark red
+                         "Expired" = "darkgrey"),
+                     name = "") +
+  scale_x_date(name = "List Date") +
+  facet_wrap(~ loc_bin, scales = "free", ncol = 1) +
+  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
+  scale_y_continuous(name = "Price", labels = c())
+```
+
+## Assessment vs. Sale Price
+
+```{r Assessment vs. Sale Price}
+
+listings_all %>%
+  filter(status == "Sold",
+         assessment < 1E6,
+         assessment_year == "2020") %>%
+  ggplot(aes(x = assessment, y = price)) +
+  geom_point(aes(color = loc_bin), na.rm = TRUE) +
+  scale_color_viridis_d(option = "plasma", name = "", end = 7/9) +
+  scale_x_continuous(name = "Assessment (2020)", labels = scales::dollar) +
+  scale_y_continuous(name = "Sale Price", labels = scales::dollar) +
+  geom_abline(slope = 1, lty = 2)
+```
+
+### More than Double Assessment
+```{r Double assessment}
+listings_all %>% 
+  filter(status == "Sold",
+         assessment > 0,
+         (price - assessment) / assessment > 2) %>%
+  select(street, city, postal, assessment, price, status, url)
+```

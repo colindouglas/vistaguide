@@ -54,15 +54,9 @@ class Viewpoint(webdriver.Firefox):
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
         # Init the webdriver with the options and Firefox profile defined above
         # If 'geckodriver' isn't in the path, just an explicitly location
-        try:
-            super().__init__(profile,
-                             options=options,
-                             log_path='logs/geckodriver.log')
-        except FileNotFoundError:
-            super().__init__(profile,
-                             executable_path='/usr/local/bin/geckodriver',
-                             options=options,
-                             log_path='logs/geckodriver.log')
+        super().__init__(profile,
+                         options=options,
+                         log_path='logs/geckodriver.log')
 
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
@@ -98,7 +92,7 @@ class Viewpoint(webdriver.Firefox):
         new_window = list({x for x in self.window_handles} - {index_window})
         if new_window:
             self.switch_to.window(new_window[0])
-            wait('Switched to window', 3)
+            wait('Switched focus to popup window', 3)
 
         # Click on the print button
         self.find_element_by_class_name('cutsheet-print').click()
@@ -111,7 +105,7 @@ class Viewpoint(webdriver.Firefox):
         # Switch context to the printable page
         new_window = list({x for x in self.window_handles} - {index_window})[0]
         self.switch_to.window(new_window)
-        wait('Switched to printable window', 5)
+        wait('Switched focus to printable window', 5)
 
     # This is the function that does all of the scraping and writes it to the path in 'out'
     # The first argument is a Selenium driver that is currently focused on a the "Print"
@@ -120,7 +114,8 @@ class Viewpoint(webdriver.Firefox):
         # Run the listing page source through beautiful soup
         listing = BeautifulSoup(self.page_source, 'html.parser')
         title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()  # Take "ViewPoint.ca" out of the title
-        print('Scraping <{0}>...'.format(title))
+        print('[{dt}] Scraping <{prop}>...'.format(prop=title,
+                                                   dt=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         desc = listing.find("div", {"class": "row-fluid printsmall"}).text.strip()
         url = self.current_url
 
