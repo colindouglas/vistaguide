@@ -33,6 +33,13 @@ hrm_places <- c("Halifax", "Dartmouth", "Bedford", "Lower Sackville", "Hammonds 
                 "Beaver Bank", "Timberlea", "Middle Sackville", "Upper Sackville",
                 "Lucasville", "Fall River", "Spryfield")
 
+status_colors <- c("For Sale" = "#3288bd", # Blue
+                   "Pending" =  "#fdae61", # Yellow
+                   "Sold" = "#5aae61", # Green
+                   "Cancelled" = "#d53e4f", # Less dark red
+                   "Withdrawn" = "#9e0142", # Dark Red
+                   "Expired" = "darkgrey")
+
 listings_all <- listings_all %>%
   left_join(fsa_ns, by = "postal") %>%
   mutate(peninsula = peninsula_codes[postal_first],
@@ -43,7 +50,8 @@ listings_all <- listings_all %>%
              postal_city == "Dartmouth" | city == "Dartmouth" ~ "Dartmouth",
              postal_city %in% hrm_places | city %in% hrm_places ~ "HRM, Other",
              TRUE ~ "Rest of Province"), 
-           levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
+           levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")),
+         status = factor(status, levels = names(status_colors)))
 
 listings <- listings_all %>%
   # Keep only the unique rows, because sometimes things get posted more than once
@@ -59,8 +67,7 @@ This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS
 # Clean up the listings, bin each location into something meaningful
 hrm_vs_other <- listings %>%
   filter(price < 1E6, sqft_mla < 4000, # Nothing too fancy, thanks
-         type %in% c("Single Family", "Condominium"),
-         (!is.na(list_date) & ymd(list_date) > ymd("2020-04-01")))  # Only recent listings
+         type %in% c("Single Family", "Condominium"))
 
 
 # Fit each (location bin, type) to a linear model, extract the coefficients and make a pretty box for the graph
@@ -77,7 +84,7 @@ hrm_vs_other %>%
   geom_label(data = sqft_fits, aes(label = pretty),
              x = -Inf, y = Inf, hjust = 0, vjust = 1,
              size = 3) +
-  geom_point(aes(color = yday(ymd(list_date))), na.rm = TRUE) +
+  geom_point(aes(color = yday(ymd(list_date))), na.rm = TRUE, alpha = 0.3) +
   labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
   facet_grid(loc_bin ~ type) +
   scale_color_viridis_c(option = "plasma", 
@@ -88,15 +95,17 @@ hrm_vs_other %>%
 
 ```
 
-## Single Family Homes in HRM
+## Single Family Home Prices
 
 ```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
 
 period <- 30.4  # days
+sqft_vs_time <- listings %>%    
+  filter(status %in% c("For Sale", "Sold"),
+         type == "Single Family",
+         ymd(list_date) > ymd("2020-04-01"))
 
-price_sqft_fits <- hrm_vs_other %>%
-    filter(status %in% c("For Sale", "Sold"),
-           type == "Single Family") %>%
+price_sqft_fits <- sqft_vs_time %>%
   group_by(loc_bin, status) %>%
   summarize(N = n(),
             fit = list(lm(price/sqft_mla ~ as_date(list_date)))) %>%
@@ -109,11 +118,11 @@ price_sqft_fits <- hrm_vs_other %>%
            is.nan(slope_stderr) | is.na(slope_stderr) ~ as.character(NA),
            abs(slope) < abs(2 * slope_stderr) ~ paste0("n.s. (", scales::dollar(round(slope * period), accuracy = NULL), ")"),
            TRUE ~ paste("Δ/month:", 
-                               scales::dollar(round(slope * period), accuracy = NULL), 
-                               "±",
-                               round(slope_stderr*2 * period, 0))))
+                        scales::dollar(round(slope * period), accuracy = NULL), 
+                        "±",
+                        round(slope_stderr*2 * period, 0))))
 
-hrm_vs_other %>%
+sqft_vs_time %>%
   filter(status %in% c("For Sale", "Sold"),
          type == "Single Family") %>%
   ggplot(aes(x = list_date, y = price/sqft_mla)) +
@@ -127,13 +136,13 @@ hrm_vs_other %>%
   scale_color_viridis_d(option = "plasma", 
                         direction = -1,
                         name = "")
-  
+
 
 ```
 
 ## Where are the Listings?
 
-```{r where are the listings, fig.width = 8, fig.height = 6}
+```{r Listing Location, fig.width = 8, fig.height = 6}
 
 top_20_cities <- listings %>% 
   distinct(mls_no, .keep_all = TRUE) %>%
@@ -163,7 +172,7 @@ listings %>%
 
 ## When are they being listed?
 
-```{r By List Date}
+```{r When are the listings}
 
 listings %>%
   distinct(mls_no, .keep_all = TRUE) %>%
@@ -177,7 +186,21 @@ listings %>%
   scale_y_continuous(name = "Count")
 ```
 
-## Real Estate Agents are Bad at Postal Codes
+## Listing By Status Per Day
+
+```{r Status by Day}
+
+listings_all %>%
+  mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
+  filter(ymd(list_date) > ymd("2020-04-01")) %>%
+  ggplot(aes(x = as_date(ymd_hms(datetime)))) +
+  geom_bar(aes(fill = status), position = position_dodge2(preserve = "single"), width = 1) +
+  scale_fill_manual(values = status_colors, name = "") +
+  xlab("Date Scraped") +
+  scale_y_continuous(name = "Count")
+```
+
+## Postal Codes are Hard
 
 In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
 
@@ -206,8 +229,32 @@ listings %>%
 ```
 
 ## Price Changes vs. Status
-
+### Changes in Price
 ```{r Price Changes, fig.width = 8, fig.height = 8}
+listings_with_change <- listings %>%
+  filter(status != "Pending") %>%
+  group_by(pid) %>%
+  distinct(status, price, .keep_all = TRUE) %>%
+  filter(length(unique(status)) > 1, # Has more than one datapoint
+         (length(unique(price)) > 1 | status == "Sold")) %>% # Either it has a "Sold" data point or it has a price change
+  pull(pid)
+
+listings_all %>%
+  filter(pid %in% listings_with_change,
+         price < 1E6) %>%
+  ggplot(aes(x = as_date(datetime), y = price)) +
+  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
+  geom_point(aes(color = status), size = 4) +
+  scale_color_manual(values = status_colors, name = "") +
+  scale_x_date(name = "List Date") +
+  facet_wrap(~ loc_bin, scales = "free_y", ncol = 1) +
+  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
+  scale_y_continuous(name = "Price", labels = c())
+```
+
+### Changes in Status
+
+```{r Everything with Status Change, fig.width = 8, fig.height = 8}
 listings_with_change <- listings %>%
   filter(status != "Pending") %>%
   group_by(pid) %>%
@@ -221,23 +268,16 @@ listings_all %>%
   ggplot(aes(x = as_date(datetime), y = price)) +
   geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
   geom_point(aes(color = status), size = 4) +
-  scale_color_manual(values =
-                       c("For Sale" = "#3288bd", # Blue
-                         "Pending" =  "#fdae61", # Yellow
-                         "Sold" = "#5aae61", # Green
-                         "Withdrawn" = "#9e0142", # Dark Red
-                         "Cancelled" = "#d53e4f", # Less dark red
-                         "Expired" = "darkgrey"),
-                     name = "") +
+  scale_color_manual(values = status_colors, name = "") +
   scale_x_date(name = "List Date") +
-  facet_wrap(~ loc_bin, scales = "free", ncol = 1) +
+  facet_wrap(~ loc_bin, scales = "free_y", ncol = 1) +
   ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
   scale_y_continuous(name = "Price", labels = c())
 ```
 
 ## Assessment vs. Sale Price
 
-```{r Assessment vs. Sale Price}
+```{r Assessment vs. Sale Price, fig.width = 8, fig.height = 5}
 
 listings_all %>%
   filter(status == "Sold",
@@ -248,14 +288,27 @@ listings_all %>%
   scale_color_viridis_d(option = "plasma", name = "", end = 7/9) +
   scale_x_continuous(name = "Assessment (2020)", labels = scales::dollar) +
   scale_y_continuous(name = "Sale Price", labels = scales::dollar) +
-  geom_abline(slope = 1, lty = 2)
+  geom_abline(slope = c(1, 2, 3, 4, 5), 
+              alpha = 1/c(1, 2, 3, 4, 5),
+              lty = c(2, 3, 3, 3, 3))
 ```
 
 ### More than Double Assessment
 ```{r Double assessment}
 listings_all %>% 
+  distinct(pid, .keep_all = TRUE) %>%
   filter(status == "Sold",
          assessment > 0,
          (price - assessment) / assessment > 2) %>%
-  select(street, city, postal, assessment, price, status, url)
+  mutate(ratio = round(price / assessment, 1)) %>%
+  select(street, city, postal, assessment, price, ratio, url) %>%
+  arrange(-price)
+```
+
+### Predicting Sale Price from Assessment
+```{r Sale Price Prediction}
+listings_all %>%
+  filter(status == "Sold", type == "Single Family") %>%
+  lm(price ~ assessment, data = .) %>%
+  summary()
 ```

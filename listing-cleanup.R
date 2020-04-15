@@ -176,8 +176,6 @@ listings_u <- listings %>%
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
 
 # Where to write the output file
-todays_date <- format(Sys.Date(), format = "%Y%m%d")
-# path_out <- paste0("data/listings-clean_", todays_date, ".csv")
 path_out <- paste0("data/listings-clean.csv")
 
 # Write the file

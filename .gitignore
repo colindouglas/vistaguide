@@ -2,10 +2,9 @@
 __*
 /venv/
 /data
-.username
+config.txt
 .Rproj.user
-*.Rproj
 .Rhistory
 .idea
-.Rproj.user
 /logs/
+*.html
