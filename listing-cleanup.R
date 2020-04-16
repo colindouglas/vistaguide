@@ -1,6 +1,9 @@
 library(tidyverse)
 library(lubridate)
 
+# Convert the weird CSVs that aren't formated right to TSVs
+source("csv_to_tsv.R")
+
 # For x = 'prefix: data' return 'data'
 drop_prefix <- function(x, prefix) {
   out <- str_replace(x, prefix, '') %>% str_trim() %>% pluck(1)
@@ -27,8 +30,12 @@ extract_number <- function(x) {
 }
 
 # Open all of the files that match listing_ddddddddd.csv in the folder, bind them together
-files <- list.files('data/', pattern = "(listings)_[0-9]{9}\\.csv", full.names = TRUE)
-raw_rows <- suppressWarnings(map_dfr(files, ~ read_tsv(., col_names = FALSE, col_types = cols())))
+files <- list.files('data', pattern = "(listings)_[0-9]{9}\\.tsv", full.names = TRUE)
+raw_rows <- map_dfr(files, function(x) {
+  message("Reading ", x)
+  suppressWarnings(out <- read_tsv(x, col_names = FALSE, col_types = cols(), guess_max = 10000))
+  filter(out, !is.na(X2))
+})
 
 
 # Function to parse the not-necessarily-ordered fields in a row
@@ -170,8 +177,11 @@ listings_u <- listings %>%
     unit = case_when(
       grepl("Unit \\d+", address) ~ str_replace(str_extract(address, pattern = "Unit \\d+"), "Unit ", ""),
       TRUE ~ as.character(NA)),
-    address = str_replace(address, pattern = "Unit \\d+ ", "")
-    ) %>%
+    address = str_replace(address, pattern = "Unit \\d+ ", ""),
+    price = case_when(
+      price < 10000 ~ price*100, # Catches bug where the last two digits of the price don't come through
+      TRUE ~ price)
+    )%>%
   # Split the address into a street and a city
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
 

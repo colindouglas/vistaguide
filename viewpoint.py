@@ -129,7 +129,8 @@ class Viewpoint(webdriver.Firefox):
 
         # Append the list to the output file 'out'
         with open(out, 'a') as file:
-            file.write('\t'.join(listing_row))
+            tsv = '\t'.join(listing_row)
+            file.write(tsv)
         wait('Finished scraping', 5)
 
     # This function goes through the listings in an index and scrapes them all and writes to the path in 'out'

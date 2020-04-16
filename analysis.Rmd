@@ -66,7 +66,7 @@ This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS
 
 # Clean up the listings, bin each location into something meaningful
 hrm_vs_other <- listings %>%
-  filter(price < 1E6, sqft_mla < 4000, # Nothing too fancy, thanks
+  filter(price < 1E6, between(sqft_mla, 450, 4000), # Nothing too fancy, thanks
          type %in% c("Single Family", "Condominium"))
 
 
@@ -80,16 +80,18 @@ sqft_fits <- hrm_vs_other %>%
                          ifelse(is.na(slope), "", paste("\nPer Sq. ft.: ", scales::dollar(signif(slope, 3))))))
 
 hrm_vs_other %>%
+  mutate(days_since = as.numeric(ymd(list_date) - ymd("2020-04-01"))) %>%
+  filter(days_since >= 0) %>%
   ggplot(aes(x = sqft_mla, y = price)) +
   geom_label(data = sqft_fits, aes(label = pretty),
              x = -Inf, y = Inf, hjust = 0, vjust = 1,
              size = 3) +
-  geom_point(aes(color = yday(ymd(list_date))), na.rm = TRUE, alpha = 0.3) +
+  geom_point(aes(color = days_since), na.rm = TRUE, alpha = 0.3) +
   labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
   facet_grid(loc_bin ~ type) +
   scale_color_viridis_c(option = "plasma", 
                         direction = -1,
-                        name = "List (DoY)") +
+                        name = "Days Since\n2020-04-01") +
   scale_y_continuous(labels = scales::dollar) +
   geom_smooth(method = "lm", formula = y ~ x, na.rm = TRUE, color = "darkgrey")
 
@@ -103,7 +105,8 @@ period <- 30.4  # days
 sqft_vs_time <- listings %>%    
   filter(status %in% c("For Sale", "Sold"),
          type == "Single Family",
-         ymd(list_date) > ymd("2020-04-01"))
+         ymd(list_date) > ymd("2020-04-01"),
+         between(sqft_mla, 450, 4000))
 
 price_sqft_fits <- sqft_vs_time %>%
   group_by(loc_bin, status) %>%
@@ -172,7 +175,7 @@ listings %>%
 
 ## When are they being listed?
 
-```{r When are the listings}
+```{r When are the listings, fig.width = 8, fig.height = 4}
 
 listings %>%
   distinct(mls_no, .keep_all = TRUE) %>%
@@ -188,14 +191,15 @@ listings %>%
 
 ## Listing By Status Per Day
 
-```{r Status by Day}
+```{r Status by Day, fig.width = 8, fig.height = 8}
 
 listings_all %>%
   mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
   filter(ymd(list_date) > ymd("2020-04-01")) %>%
   ggplot(aes(x = as_date(ymd_hms(datetime)))) +
-  geom_bar(aes(fill = status), position = position_dodge2(preserve = "single"), width = 1) +
-  scale_fill_manual(values = status_colors, name = "") +
+  geom_bar(aes(fill = status), width = 0.9) +
+  scale_fill_manual(values = status_colors, name = "", guide = FALSE) +
+  facet_grid(status ~ ., scales = "free_y") +
   xlab("Date Scraped") +
   scale_y_continuous(name = "Count")
 ```
