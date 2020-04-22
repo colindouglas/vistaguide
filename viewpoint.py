@@ -95,8 +95,13 @@ class Viewpoint(webdriver.Firefox):
             wait('Switched focus to popup window', 3)
 
         # Click on the print button
-        self.find_element_by_class_name('cutsheet-print').click()
-        wait('Clicked on print button', 2)
+        try:
+            self.find_element_by_class_name('cutsheet-print').click()
+            wait('Clicked on print button', 2)
+        except sce.NoSuchElementException:
+            wait('Tried to click too fast! Doing a big wait', 10)
+            self.find_element_by_class_name('cutsheet-print').click()
+            wait('Clicked on print button', 2)
 
         # If the index is opening popup windows, close the 'pretty' window
         self.close()
