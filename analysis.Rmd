@@ -236,12 +236,13 @@ close_order <- listings %>%
   unique()
 
 col_num <- 4
-figure_rows <- length(unique(listings_with_change)) %/% col_num + 1
+last_listings <- 20 
+figure_rows <- last_listings %/% col_num + 1
 ```
 
 ```{r Price Changes Graph, fig.width = 10, fig.height = figure_rows + 2}
 listings_all %>%
-  filter(pid %in% listings_with_change,
+  filter(pid %in% tail(unique(listings_with_change), last_listings),
          price < 1E6) %>%
   arrange(list_date) %>%
   mutate(address = factor(address, levels = close_order)) %>%
@@ -274,13 +275,13 @@ close_order <- listings %>%
   pull(address) %>%
   unique()
 
-figure_rows <- length(unique(listings_with_change)) %/% col_num + 1
+figure_rows <- last_listings %/% col_num + 1
 
 ```
 
 ```{r Status Change Figure, fig.width = 10, fig.height = figure_rows + 2}
 listings_all %>%
-  filter(pid %in% listings_with_change,
+  filter(pid %in% tail(unique(listings_with_change), last_listings),
          price < 1E6) %>%
   arrange(list_date) %>%
   mutate(address = factor(address, levels = close_order)) %>%
@@ -293,6 +294,41 @@ listings_all %>%
   ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
   scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+change_plot <- listings_all %>%
+  group_by(pid) %>%
+  filter(n() > 1) %>%
+  arrange(datetime) %>%
+  mutate(price_change = (price - lag(price))/lag(price)) %>%
+  filter(!(is.na(price_change)),
+         abs(price_change) < 0.5)
+```
+
+## Price Changes Over Time
+### Everything
+```{r price changes over time}
+price_change_fig <- change_plot %>%
+  ggplot(aes(x = datetime, y = price_change)) +
+  geom_jitter(data = filter(change_plot, price_change != 0), aes(color = status), width = 60*60*24, height = 0, alpha = 0.3) +
+  geom_smooth(data = filter(change_plot, status %in% c("Sold", "For Sale", "Pending")), 
+              formula = y ~ x,
+              method = "loess", 
+              aes(color = status), 
+              level = 0,
+              lwd = 0.5) +
+  scale_color_manual(values = status_colors, name = "") +
+  labs(x = "Change Date") +
+  scale_y_continuous(name = "Price", labels = scales::percent, minor_breaks = seq(-1, 1, by = .05)) +
+  geom_hline(yintercept = 0, lty = 2, lwd = 0.25) +
+  scale_alpha_continuous(guide = FALSE)
+
+price_change_fig
+```
+
+### Last Two Weeks
+```{r}
+price_change_fig +
+  scale_x_datetime(limits = c(now() - weeks(2), now()))
 ```
 
 ## Assessment vs. Sale Price

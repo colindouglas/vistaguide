@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 import viewpoint as vp
- 
+
 # Read credentials from config file (./config.txt)
 config = ConfigParser()
 config.read('config.txt')
@@ -34,7 +34,7 @@ for x in range(0, 3):
         # If this works, record that there were no errors
         error = None
 
-    # Sometimes there are random server errors. If they happen, bail print the error
+    # Sometimes there are random server errors. If they happen, bail and print the error
     # The loop will start again
     except Exception as error:
         vp.wait("Error in scraping listings", 60 * 10)  # Wait 10 minutes if there's an error
