@@ -178,13 +178,39 @@ listings %>%
 
 listings_all %>%
   mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
-  filter(ymd(list_date) > ymd("2020-04-01")) %>%
+  filter(!is.na(status)) %>%
   ggplot(aes(x = as_date(ymd_hms(datetime)))) +
   geom_bar(aes(fill = status), width = 0.9) +
   scale_fill_manual(values = status_colors, name = "", guide = FALSE) +
   facet_grid(status ~ ., scales = "free_y") +
   xlab("Date Scraped") +
   scale_y_continuous(name = "Count")
+```
+
+## Changes in Inventory
+This figure shows the net change in inventory in a given day. It is calculated as new listings with a status of "For Sale" minus the sum of new listings with the statuses "Sold", "Expired", "Withdrawn", and "Cancelled". Listings with a status of "Pending" are ignored.
+```{r Balance in Listings}
+listing_type <- c("For Sale" = "enter", 
+                  "Sold" = "exit", 
+                  "Pending" = NA, 
+                  "Withdrawn" = "exit", 
+                  "Cancelled" = "exit", 
+                  "Expired" = "exit")
+
+volume_changes <- listings_all %>%
+  mutate(status_type = listing_type[status]) %>%
+  filter(!is.na(status_type)) %>%
+  group_by(date = as_date(datetime), status_type) %>%
+  summarize(N = n()) %>%
+  pivot_wider(id_cols = date, names_from = "status_type", values_from = "N") %>%
+  mutate(net_change = enter - exit)
+
+volume_changes %>%
+  ggplot(aes(x = date, y = net_change)) +
+  geom_col(aes(fill = net_change > 0)) +
+  scale_fill_manual(values = unname(status_colors[c(3, 1)]), guide = FALSE) +
+  geom_text(aes(y = net_change + 2 * sign(net_change), label = net_change)) +
+  labs(x = "Date", y = "Net Change in Active Listings")
 ```
 
 ## Postal Codes are Hard
@@ -295,6 +321,12 @@ listings_all %>%
   scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
+
+```
+
+## Price Shifts on Status Changes
+```{r price changes over time, fig.width = 8, fig.height = 4}
+
 change_plot <- listings_all %>%
   group_by(pid) %>%
   filter(n() > 1) %>%
@@ -302,33 +334,34 @@ change_plot <- listings_all %>%
   mutate(price_change = (price - lag(price))/lag(price)) %>%
   filter(!(is.na(price_change)),
          abs(price_change) < 0.5)
-```
 
-## Price Changes Over Time
-### Everything
-```{r price changes over time}
-price_change_fig <- change_plot %>%
+change_labels <- change_plot %>%
+  group_by(status) %>%
+  filter(datetime > now() - weeks(1),
+         status %in% c("Sold", "For Sale")) %>%
+  summarize(mean_change = mean(price_change))
+
+
+change_plot %>%
   ggplot(aes(x = datetime, y = price_change)) +
-  geom_jitter(data = filter(change_plot, price_change != 0), aes(color = status), width = 60*60*24, height = 0, alpha = 0.3) +
-  geom_smooth(data = filter(change_plot, status %in% c("Sold", "For Sale", "Pending")), 
+  geom_jitter(data = filter(change_plot, price_change != 0), aes(color = status), width = 60*60*24*0.5, height = 0, alpha = 0.3) +
+  geom_smooth(data = filter(change_plot, status %in% c("Sold", "For Sale")), 
               formula = y ~ x,
               method = "loess", 
               aes(color = status), 
               level = 0,
               lwd = 0.5) +
   scale_color_manual(values = status_colors, name = "") +
-  labs(x = "Change Date") +
-  scale_y_continuous(name = "Price", labels = scales::percent, minor_breaks = seq(-1, 1, by = .05)) +
+  labs(x = "Posting Date") +
+  scale_y_continuous(name = "Price Change Since Last Event", labels = scales::percent, minor_breaks = seq(-1, 1, by = .05)) +
   geom_hline(yintercept = 0, lty = 2, lwd = 0.25) +
-  scale_alpha_continuous(guide = FALSE)
+  scale_alpha_continuous(guide = FALSE) +
+  #facet_grid(loc_bin ~ ., scales = "free_y") + 
+  scale_x_datetime(limits = c(as_datetime(NA), now() + days(1))) +
+  ggrepel::geom_label_repel(data = change_labels, x = now(), 
+                            aes(y = mean_change, color = status, label = scales::percent(mean_change, accuracy = 0.01)), 
+                            hjust = 0, direction = 'y')
 
-price_change_fig
-```
-
-### Last Two Weeks
-```{r}
-price_change_fig +
-  scale_x_datetime(limits = c(now() - weeks(2), now()))
 ```
 
 ## Assessment vs. Sale Price
