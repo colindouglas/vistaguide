@@ -13,7 +13,8 @@ for x in range(0, 3):
         # Log into ViewPoint
         session = vp.Viewpoint(
             username=config['credentials']['username'],
-            password=config['credentials']['password']
+            password=config['credentials']['password'],
+            # headless=False
         )
 
         # Open the Dashboard for a text list

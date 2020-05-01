@@ -61,7 +61,7 @@ listings <- listings_all %>%
 
 ```
 # Summary
-This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The last update was performed on `r as_date(max(listings$datetime, na.rm = TRUE))`, and scraped **`r listings %>% filter(as_date(datetime) == as_date(max(datetime))) %>% pull(pid) %>% unique() %>% length()`** different listings.
+This dataset contains **`r nrow(listings_all)` data points** on **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The last update was performed on **`r as_date(max(listings$datetime, na.rm = TRUE))`**, and scraped **`r listings %>% filter(as_date(datetime) == as_date(max(datetime))) %>% pull(pid) %>% unique() %>% length()`** different listing pages.
 
 # Volume
 ## Where are the Listings?
