@@ -1,10 +1,11 @@
 ---
 title: "Halifax Listings"
 author: "Colin Douglas"
-date: "06/04/2020"
+date: "6-Apr-2020"
 output: 
   html_document:
     toc: true
+    toc_float: true
     df_print: paged
     code_folding: hide
 ---
@@ -60,7 +61,7 @@ listings <- listings_all %>%
 
 ```
 # Summary
-This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The last update was performed on `r as_date(max(listings$datetime, na.rm = TRUE))`, and scraped **`r listings %>% filter(as_date(datetime) == as_date(max(datetime))) %>% pull(pid) %>% unique()`** different listings.
+This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The last update was performed on `r as_date(max(listings$datetime, na.rm = TRUE))`, and scraped **`r listings %>% filter(as_date(datetime) == as_date(max(datetime))) %>% pull(pid) %>% unique() %>% length()`** different listings.
 
 # Volume
 ## Where are the Listings?
@@ -194,8 +195,8 @@ hrm_vs_other %>%
 
 sqft_vs_time <- listings %>%    
   filter(status %in% c("For Sale", "Sold"),
-         type %in% c("Single Family", "Condominium", "Duplex", "Triplex", "Land & Acreage", "Cottage & Recreational"),
-         between(sqft_mla, 450, 4000))
+         between(sqft_mla, 450, 4000),
+         !is.na(type))
 
 svt_fit <- sqft_vs_time %>%
   group_by(status, type, loc_bin) %>%
@@ -209,8 +210,7 @@ sqft_plot <- sqft_vs_time %>%
   geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01) +
   labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
   scale_color_viridis_d(option = "plasma", 
-                        direction = -1,
-                        end = 8/9,
+                        end = 6/9,
                         name = "")
 
 suppressWarnings(print(sqft_plot))
@@ -276,7 +276,7 @@ listings_all %>%
               lty = c(2, 3, 3, 3, 3))
 ```
 
-# Lying with Postal Codes
+# Postal Codes
 
 In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
 
@@ -303,7 +303,7 @@ listings %>%
          `City from Postal Code` = postal_city,
          Count = n) 
 ```
-# Single-Property Data
+# Listing-Level Analysis
 ## Changes in Price
 
 These are the 20 most recently-listed addresses that have a change and have "Sold" somewhere in their recent history.
@@ -396,6 +396,7 @@ listings_all %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
 ```
+
 ## Listings on Gladstone
 
 ```{r Listings at on Gladstone}
