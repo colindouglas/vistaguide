@@ -243,6 +243,8 @@ listings %>%
 
 ## Price Changes vs. Status
 ### Changes in Price
+
+These are the 20 most recently-listed addresses that have a change and have "Sold" somewhere in their recent history.
 ```{r Price Changes}
 listings_with_change <- listings %>%
   filter(status != "Pending") %>%
@@ -267,6 +269,14 @@ figure_rows <- last_listings %/% col_num + 1
 ```
 
 ```{r Price Changes Graph, fig.width = 10, fig.height = figure_rows + 2}
+
+pid_to_address <- listings_all %>%
+  group_by(pid) %>%
+  summarize(address = head(address, 1))
+
+pid_labeller <- pid_to_address$address
+names(pid_labeller) <- as.character(pid_to_address$pid)
+
 listings_all %>%
   filter(pid %in% tail(unique(listings_with_change), last_listings),
          price < 1E6) %>%
@@ -277,13 +287,15 @@ listings_all %>%
   geom_point(aes(color = status), size = 4) +
   scale_color_manual(values = status_colors, name = "") +
   scale_x_date(name = "List Date") +
-  facet_wrap(~ address, scales = "free_y", ncol = col_num) +
+  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
   ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
   scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 ### Changes in Status
+
+These are the 20 most recently-listed addresses that have a change. They don't necessarily have a "sold" entry in their history.
 
 ```{r Everything with Status Change, fig.width = 8, fig.height = 8}
 listings_with_change <- listings %>%
@@ -316,7 +328,7 @@ listings_all %>%
   geom_point(aes(color = status), size = 4) +
   scale_color_manual(values = status_colors, name = "") +
   scale_x_date(name = "List Date") +
-  facet_wrap(~ address, scales = "free_y", ncol = col_num) +
+  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
   ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
   scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
