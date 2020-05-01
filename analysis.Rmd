@@ -4,6 +4,7 @@ author: "Colin Douglas"
 date: "06/04/2020"
 output: 
   html_document:
+    toc: true
     df_print: paged
     code_folding: hide
 ---
@@ -58,74 +59,10 @@ listings <- listings_all %>%
   distinct(mls_no, price, status, .keep_all = TRUE)
 
 ```
+# Summary
+This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The last update was performed on `r as_date(max(listings$datetime, na.rm = TRUE))`, and scraped **`r listings %>% filter(as_date(datetime) == as_date(max(datetime))) %>% pull(pid) %>% unique()`** different listings.
 
-This dataset contains **`r listings$mls_no %>% unique() %>% length()` unique MLS listings**. The earliest point at which data was collected was `r as_date(min(listings$datetime, na.rm = TRUE))`, and the most recent listing was scraped on `r as_date(max(listings$datetime, na.rm = TRUE))`.
-
-## Price per Square Foot Across the Province
-```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
-
-# Clean up the listings, bin each location into something meaningful
-hrm_vs_other <- listings %>%
-  filter(price < 1E6, between(sqft_mla, 450, 4000), # Nothing too fancy, thanks
-         type %in% c("Single Family", "Condominium"))
-
-
-# Fit each (location bin, type) to a linear model, extract the coefficients and make a pretty box for the graph
-sqft_fits <- hrm_vs_other %>%
-  group_by(loc_bin, type) %>%
-  do(fit = lm(.$price ~ .$sqft_mla)) %>%
-  mutate(slope = fit$coefficients[2],
-         intercept = fit$coefficients[1],
-         pretty = paste0("Base: ", scales::dollar(signif(intercept, 3)),
-                         ifelse(is.na(slope), "", paste("\nPer Sq. ft.: ", scales::dollar(signif(slope, 3))))))
-
-hrm_vs_other %>%
-  mutate(days_since = as.numeric(ymd(list_date) - ymd("2020-04-01"))) %>%
-  filter(days_since >= 0) %>%
-  ggplot(aes(x = sqft_mla, y = price)) +
-  geom_label(data = sqft_fits, aes(label = pretty),
-             x = -Inf, y = Inf, hjust = 0, vjust = 1,
-             size = 3) +
-  geom_point(aes(color = days_since), na.rm = TRUE, alpha = 0.3) +
-  labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
-  facet_grid(loc_bin ~ type) +
-  scale_color_viridis_c(option = "plasma", 
-                        direction = -1,
-                        name = "Days Since\n2020-04-01") +
-  scale_y_continuous(labels = scales::dollar) +
-  geom_smooth(method = "lm", formula = y ~ x, na.rm = TRUE, color = "darkgrey")
-
-```
-
-## Single Family Home Prices
-
-```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
-
-sqft_vs_time <- listings %>%    
-  filter(status %in% c("For Sale", "Sold"),
-         type == "Single Family",
-         (ymd(list_date) > ymd("2020-04-01") | status == "Sold" & ymd(list_date) > ymd("2020-01-01")),
-         between(sqft_mla, 450, 4000))
-
-
-sqft_plot <- sqft_vs_time %>%
-  filter(status %in% c("For Sale", "Sold"),
-         type == "Single Family") %>%
-  ggplot(aes(x = list_date, y = price/sqft_mla)) +
-  geom_point(alpha = 0.5, aes(color = substring(postal_first, 1, 2))) +
-  facet_grid(loc_bin ~ status, scales = "free") +
-  geom_smooth(method = "loess", formula = y~x, color = "darkgrey") +
-  labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
-  scale_color_viridis_d(option = "plasma", 
-                        direction = -1,
-                        end = 8/9,
-                        name = "")
-
-suppressWarnings(print(sqft_plot))
-
-
-```
-
+# Volume
 ## Where are the Listings?
 
 ```{r Listing Location, fig.width = 8, fig.height = 6}
@@ -156,7 +93,7 @@ listings %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 ```
 
-## When are they being listed?
+## When are they Being Listed
 
 ```{r When are the listings, fig.width = 8, fig.height = 4}
 
@@ -213,130 +150,75 @@ volume_changes %>%
   labs(x = "Date", y = "Net Change in Active Listings")
 ```
 
-## Postal Codes are Hard
 
-In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
+# Pricing
+## Per Square Foot in Different Regions
+```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
 
-### Postal Codes That Don't Exist
-
-```{r Postal codes that dont exist, rows.print = 10}
-listings %>%
-  filter(is.na(postal_city)) %>%
-  group_by(city) %>%
-  summarize(Count = n(),
-            `Postal Codes` = str_trunc(paste(postal, collapse = ", "), 70)) %>%
-  arrange(-Count) %>%
-  rename(`Listed City` = city)
-```
-### Postal Codes That Describe Somewhere Else
+# Clean up the listings, bin each location into something meaningful
+hrm_vs_other <- listings %>%
+  filter(price < 1E6, between(sqft_mla, 450, 4000), # Nothing too fancy, thanks
+         type %in% c("Single Family", "Condominium"))
 
 
-```{r Check for messed up regions, rows.print = 10}
-listings %>%
-  filter(city != postal_city) %>%
-  count(city, postal_city) %>%
-  arrange(-n) %>%
-  rename(`Listing City` = city,
-         `City from Postal Code` = postal_city,
-         Count = n) 
-```
+# Fit each (location bin, type) to a linear model, extract the coefficients and make a pretty box for the graph
+sqft_fits <- hrm_vs_other %>%
+  group_by(loc_bin, type) %>%
+  do(fit = lm(.$price ~ .$sqft_mla)) %>%
+  mutate(slope = fit$coefficients[2],
+         intercept = fit$coefficients[1],
+         pretty = paste0("Base: ", scales::dollar(signif(intercept, 3)),
+                         ifelse(is.na(slope), "", paste("\nPer Sq. ft.: ", scales::dollar(signif(slope, 3))))))
 
-## Price Changes vs. Status
-### Changes in Price
-
-These are the 20 most recently-listed addresses that have a change and have "Sold" somewhere in their recent history.
-```{r Price Changes}
-listings_with_change <- listings %>%
-  filter(status != "Pending") %>%
-  group_by(pid) %>%
-  distinct(status, price, .keep_all = TRUE) %>%
-  filter(length(unique(status)) > 1, # Has more than one datapoint
-         (length(unique(price)) > 1 | status == "Sold")) %>% # Either it has a "Sold" data point or it has a price change
-  arrange(list_date) %>%
-  pull(pid)
-
-close_order <- listings %>%
-  filter(pid %in% listings_with_change) %>%
-  group_by(address) %>%
-  summarize(list_date = max(datetime)) %>%
-  arrange(list_date) %>%
-  pull(address) %>%
-  unique()
-
-col_num <- 4
-last_listings <- 20 
-figure_rows <- last_listings %/% col_num + 1
-```
-
-```{r Price Changes Graph, fig.width = 10, fig.height = figure_rows + 2}
-
-pid_to_address <- listings_all %>%
-  group_by(pid) %>%
-  summarize(address = head(address, 1))
-
-pid_labeller <- pid_to_address$address
-names(pid_labeller) <- as.character(pid_to_address$pid)
-
-listings_all %>%
-  filter(pid %in% tail(unique(listings_with_change), last_listings),
-         price < 1E6) %>%
-  arrange(list_date) %>%
-  mutate(address = factor(address, levels = close_order)) %>%
-  ggplot(aes(x = as_date(datetime), y = price)) +
-  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
-  geom_point(aes(color = status), size = 4) +
-  scale_color_manual(values = status_colors, name = "") +
-  scale_x_date(name = "List Date") +
-  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
-  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
-  scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-```
-
-### Changes in Status
-
-These are the 20 most recently-listed addresses that have a change. They don't necessarily have a "sold" entry in their history.
-
-```{r Everything with Status Change, fig.width = 8, fig.height = 8}
-listings_with_change <- listings %>%
-  filter(status != "Pending") %>%
-  group_by(pid) %>%
-  distinct(status, price, .keep_all = TRUE) %>%
-  filter(length(unique(status)) > 1) %>%
-  pull(pid)
-
-close_order <- listings %>%
-  filter(pid %in% listings_with_change) %>%
-  group_by(address) %>%
-  summarize(list_date = max(datetime)) %>%
-  arrange(list_date) %>%
-  pull(address) %>%
-  unique()
-
-figure_rows <- last_listings %/% col_num + 1
+hrm_vs_other %>%
+  mutate(days_since = as.numeric(ymd(list_date) - ymd("2020-04-01"))) %>%
+  filter(days_since >= 0) %>%
+  ggplot(aes(x = sqft_mla, y = price)) +
+  geom_label(data = sqft_fits, aes(label = pretty),
+             x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             size = 3) +
+  geom_point(aes(color = days_since), na.rm = TRUE, alpha = 0.3) +
+  labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
+  facet_grid(loc_bin ~ type) +
+  scale_color_viridis_c(option = "plasma", 
+                        direction = -1,
+                        name = "Days Since\n2020-04-01") +
+  scale_y_continuous(labels = scales::dollar) +
+  geom_smooth(method = "lm", formula = y ~ x, na.rm = TRUE, color = "darkgrey")
 
 ```
 
-```{r Status Change Figure, fig.width = 10, fig.height = figure_rows + 2}
-listings_all %>%
-  filter(pid %in% tail(unique(listings_with_change), last_listings),
-         price < 1E6) %>%
-  arrange(list_date) %>%
-  mutate(address = factor(address, levels = close_order)) %>%
-  ggplot(aes(x = as_date(datetime), y = price)) +
-  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
-  geom_point(aes(color = status), size = 4) +
-  scale_color_manual(values = status_colors, name = "") +
-  scale_x_date(name = "List Date") +
-  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
-  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
-  scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+## Price Trends by Listing Type
 
+```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
+
+sqft_vs_time <- listings %>%    
+  filter(status %in% c("For Sale", "Sold"),
+         type %in% c("Single Family", "Condominium", "Duplex", "Triplex", "Land & Acreage", "Cottage & Recreational"),
+         between(sqft_mla, 450, 4000))
+
+svt_fit <- sqft_vs_time %>%
+  group_by(status, type, loc_bin) %>%
+  filter(n() > 10)
+
+
+sqft_plot <- sqft_vs_time %>% 
+  ggplot(aes(x = datetime, y = price/sqft_mla)) +
+  geom_point(alpha = 0.2, aes(color = type)) +
+  facet_grid(loc_bin ~ status, scales = "free_y") +
+  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01) +
+  labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
+  scale_color_viridis_d(option = "plasma", 
+                        direction = -1,
+                        end = 8/9,
+                        name = "")
+
+suppressWarnings(print(sqft_plot))
 
 ```
 
-## Price Shifts on Status Changes
+
+## List Price vs. Sale Price and Re-List Price
 ```{r price changes over time, fig.width = 8, fig.height = 4}
 
 change_plot <- listings_all %>%
@@ -394,22 +276,133 @@ listings_all %>%
               lty = c(2, 3, 3, 3, 3))
 ```
 
-### More than Double Assessment
-```{r Double assessment}
-listings_all %>% 
-  distinct(pid, .keep_all = TRUE) %>%
-  filter(status == "Sold",
-         assessment > 0,
-         (price - assessment) / assessment > 2) %>%
-  mutate(ratio = round(price / assessment, 1)) %>%
-  select(street, city, postal, assessment, price, ratio, url) %>%
-  arrange(-price)
+# Lying with Postal Codes
+
+In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
+
+## Postal Codes That Don't Exist
+
+```{r Postal codes that dont exist, rows.print = 10}
+listings %>%
+  filter(is.na(postal_city)) %>%
+  group_by(city) %>%
+  summarize(Count = n(),
+            `Postal Codes` = str_trunc(paste(postal, collapse = ", "), 70)) %>%
+  arrange(-Count) %>%
+  rename(`Listed City` = city)
+```
+## Postal Codes That Describe Somewhere Else
+
+
+```{r Check for messed up regions, rows.print = 10}
+listings %>%
+  filter(city != postal_city) %>%
+  count(city, postal_city) %>%
+  arrange(-n) %>%
+  rename(`Listing City` = city,
+         `City from Postal Code` = postal_city,
+         Count = n) 
+```
+# Single-Property Data
+## Changes in Price
+
+These are the 20 most recently-listed addresses that have a change and have "Sold" somewhere in their recent history.
+```{r Price Changes}
+listings_with_change <- listings %>%
+  filter(status != "Pending") %>%
+  group_by(pid) %>%
+  distinct(status, price, .keep_all = TRUE) %>%
+  filter(length(unique(status)) > 1, # Has more than one datapoint
+         (length(unique(price)) > 1 | status == "Sold")) %>% # Either it has a "Sold" data point or it has a price change
+  arrange(list_date) %>%
+  pull(pid)
+
+close_order <- listings %>%
+  filter(pid %in% listings_with_change) %>%
+  group_by(address) %>%
+  summarize(list_date = max(datetime)) %>%
+  arrange(list_date) %>%
+  pull(address) %>%
+  unique()
+
+col_num <- 4
+last_listings <- 20 
+figure_rows <- last_listings %/% col_num + 1
 ```
 
-### Predicting Sale Price from Assessment
-```{r Sale Price Prediction}
+```{r Price Changes Graph, fig.width = 10, fig.height = figure_rows + 2}
+
+pid_to_address <- listings_all %>%
+  group_by(pid) %>%
+  summarize(address = head(address, 1))
+
+pid_labeller <- pid_to_address$address
+names(pid_labeller) <- as.character(pid_to_address$pid)
+
 listings_all %>%
-  filter(status == "Sold", type == "Single Family") %>%
-  lm(price ~ assessment, data = .) %>%
-  summary()
+  filter(pid %in% tail(unique(listings_with_change), last_listings),
+         price < 1E6) %>%
+  arrange(list_date) %>%
+  mutate(address = factor(address, levels = close_order)) %>%
+  ggplot(aes(x = as_date(datetime), y = price)) +
+  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
+  geom_point(aes(color = status), size = 4) +
+  scale_color_manual(values = status_colors, name = "") +
+  scale_x_date(name = "List Date") +
+  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
+  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
+  scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+## Changes in Status
+
+These are the 20 most recently-listed addresses that have a change. They don't necessarily have a "sold" entry in their history.
+
+```{r Everything with Status Change, fig.width = 8, fig.height = 8}
+listings_with_change <- listings %>%
+  filter(status != "Pending") %>%
+  group_by(pid) %>%
+  distinct(status, price, .keep_all = TRUE) %>%
+  filter(length(unique(status)) > 1) %>%
+  pull(pid)
+
+close_order <- listings %>%
+  filter(pid %in% listings_with_change) %>%
+  group_by(address) %>%
+  summarize(list_date = max(datetime)) %>%
+  arrange(list_date) %>%
+  pull(address) %>%
+  unique()
+
+figure_rows <- last_listings %/% col_num + 1
+
+```
+
+```{r Status Change Figure, fig.width = 10, fig.height = figure_rows + 2}
+listings_all %>%
+  filter(pid %in% tail(unique(listings_with_change), last_listings),
+         price < 1E6) %>%
+  arrange(list_date) %>%
+  mutate(address = factor(address, levels = close_order)) %>%
+  ggplot(aes(x = as_date(datetime), y = price)) +
+  geom_line(aes(group = pid, color = status), lwd = 2, alpha = 0.5) +
+  geom_point(aes(color = status), size = 4) +
+  scale_color_manual(values = status_colors, name = "") +
+  scale_x_date(name = "List Date") +
+  facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
+  ggrepel::geom_text_repel(aes(label = paste0("$", price/1000, "k"))) + 
+  scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
+## Listings on Gladstone
+
+```{r Listings at on Gladstone}
+listings_all %>%
+  filter(grepl("Gladstone", address)) %>%
+  mutate(date = as_date(datetime)) %>%
+  select(date, address=street, unit, price, condo_fee, url) %>%
+  arrange(date)
+
 ```

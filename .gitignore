@@ -8,3 +8,4 @@ config.txt
 .idea
 /logs/
 *.html
+/analysis_files
