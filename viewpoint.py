@@ -58,6 +58,9 @@ class Viewpoint(webdriver.Firefox):
                          options=options,
                          log_path='logs/geckodriver.log')
 
+        # List of URLS that failed
+        self.failed = list()
+
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
         self.set_window_size(1920, 1080)
@@ -92,41 +95,70 @@ class Viewpoint(webdriver.Firefox):
         new_window = list({x for x in self.window_handles} - {index_window})
         if new_window:
             self.switch_to.window(new_window[0])
-            wait('Switched focus to popup window', 3)
+            wait('Switched focus to popup window', 5)
+
+        # If it's failed previously, skip it
+        if self.current_url in self.failed:
+            wait('URL has already failed. Skipping ' + self.current_url, 2)
+            return False
 
         # Click on the print button
         try:
             self.find_element_by_class_name('cutsheet-print').click()
             wait('Clicked on print button', 2)
         except sce.NoSuchElementException:
-            wait('Tried to click too fast! Doing a big wait', 10)
-            self.find_element_by_class_name('cutsheet-print').click()
-            wait('Clicked on print button', 2)
+            wait('No print button! Skipping ' + self.current_url, 5)
+            self.record_failure(self.current_url)
+            return False
 
-        # If the index is opening popup windows, close the 'pretty' window
+        # Close the 'pretty' window because we're going to scrape from the printable window
         self.close()
         wait('Closed pretty window', 2)
 
         # Switch context to the printable page
-        new_window = list({x for x in self.window_handles} - {index_window})[0]
-        self.switch_to.window(new_window)
-        wait('Switched focus to printable window', 5)
+        try:
+            new_window = list({x for x in self.window_handles} - {index_window})[0]
+            self.switch_to.window(new_window)
+            wait('Switched focus to printable window', 5)
+            return True
+        except (IndexError, sce.WebDriverException):
+            wait('Couldn\'t open window. Skipping ' + self.current_url, 5)
+            self.record_failure(self.current_url)
+            return False
 
     # This is the function that does all of the scraping and writes it to the path in 'out'
     # The first argument is a Selenium driver that is currently focused on a the "Print"
     # view of a listing. The print view is much easier to scrape than the initial view
     def read(self, out='data/listings.csv'):
+
+        if self.current_url in self.failed:
+            wait('URL has already failed. Skipping ' + self.current_url, 2)
+            return None
+
         # Run the listing page source through beautiful soup
         listing = BeautifulSoup(self.page_source, 'html.parser')
-        title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()  # Take "ViewPoint.ca" out of the title
+
+        # Take "ViewPoint.ca" out of the title
+        title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()
+
+        # Sometimes the cutsheets aren't served properly, if that happens, bail
+        if len(title) <= 10:
+            wait_msg = 'Address <{title}> is suspiciously short. Skipping {url}'
+            wait(wait_msg.format(title=title, url=self.current_url), 5)
+            self.record_failure(self.current_url)
+            return None
+
         print('[{dt}] Scraping <{prop}>...'.format(prop=title,
                                                    dt=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        desc = listing.find("div", {"class": "row-fluid printsmall"}).text.strip()
-        url = self.current_url
+        try:
+            desc = listing.find("div", {"class": "row-fluid printsmall"}).text.strip()
+        except AttributeError:
+            desc = "Missing description"
 
         # Record the time and the title of the window (which contains address and postal code)
-        listing_row = [str(datetime.now()), title, url, desc]
+        listing_row = [str(datetime.now()), title, self.current_url, desc]
 
+        # Get the data table and write it to an ugly list
         for i, line in enumerate(listing.find_all('li', {'class': 'row'})):
             lines = ' '.join(list(str(line.text).split()))
             listing_row.append(lines)
@@ -155,7 +187,7 @@ class Viewpoint(webdriver.Firefox):
 
         # Go through all of the properties on this page of this page of the index and scrape them
         while bool(next_button):
-            # Find all the different properties on the index page by matching
+            # Find all the different properties on the index page by matching the text on their buttons
             listings = list()
             button_strings = ['Entered', 'day on market', 'days on market', 'null']  # Find buttons with this text
             for button_string in button_strings:
@@ -167,10 +199,16 @@ class Viewpoint(webdriver.Firefox):
             # Click on each of the buttons and scrape the resulting data
             for i, listing in enumerate(listings):
                 wait('Starting property #{p} on page {page}'.format(p=i+1, page=current_page), 2)
-                self.open(listing)
-                self.read(out=out)
-                self.close()
-                wait('Finished with property #{p} on page {page}'.format(p=i+1, page=current_page), 5)
+                # Try to open the window for each listing
+                window_opened = self.open(listing)
+
+                # If the window was opened, read the window
+                if window_opened:
+                    self.read(out=out)
+                    self.close()
+                    wait('Finished with property #{p} on page {page}'.format(p=i+1, page=current_page), 5)
+
+                # Switch back to the index to prepare for the next listing
                 self.switch_to.window(index_window)
                 wait('Switched to index window', 2)
 
@@ -196,3 +234,53 @@ class Viewpoint(webdriver.Firefox):
             out = False
             wait('No next button detected. Must be done!')
         return out
+
+    # If a URL doesn't work, record it to a log file and within the Viewpoint object
+    def record_failure(self, url, path=None):
+        if path is None:
+            path = 'logs/{dt}_failed.log'.format(dt=datetime.now().strftime('%Y%m%d'))
+        self.failed.append(self.current_url)
+        with open(path, 'a') as file:
+            file.write(url + '\n')
+
+    # This function takes a list of URLs and tries to scrape each one
+    def scrape(self, urls, path):
+        # Printable pages are scraped using the vp.read() function
+        # This is the trivial case of simply re-trying
+        for url in urls:
+            if 'cutsheet' in url:
+                self.get(url)
+                self.read(path)
+
+        # If the URL is the path to a 'pretty' listing page, we need to switch to the printable version first
+        # This adds a lot more steps
+            elif 'property' in url:
+                self.get(url)
+                main_window = self.current_window_handle
+                # --- Switch to the printable window
+                # Try to click on the print button
+                try:
+                    self.find_element_by_class_name('cutsheet-print').click()
+                    wait('Clicked on print button', 2)
+                except sce.NoSuchElementException:
+                    wait('No print button! Skipping ' + self.current_url, 5)
+                    self.record_failure(self.current_url)
+                    continue
+
+                # Switch context to the printable page
+                try:
+                    new_window = list({x for x in self.window_handles} - {main_window})[0]
+                    print("Windows open:", self.window_handles)
+                    self.switch_to.window(new_window)
+                    wait('Switched focus to printable window', 5)
+                except (IndexError, sce.WebDriverException):
+                    wait('Couldn\'t open window. Skipping ' + self.current_url, 5)
+                    self.record_failure(self.current_url)
+                    continue
+
+                # --- End of switching to printable window
+                self.read(path)
+                self.switch_to.window(main_window)
+                self.close()
+            else:
+                print('Don\'t know how to handle:', url)

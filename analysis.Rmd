@@ -157,7 +157,7 @@ volume_changes %>%
 ```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
 
 # Clean up the listings, bin each location into something meaningful
-hrm_vs_other <- listings %>%
+hrm_vs_other <- listings_all %>%
   filter(price < 1E6, between(sqft_mla, 450, 4000), # Nothing too fancy, thanks
          type %in% c("Single Family", "Condominium"))
 
@@ -193,7 +193,7 @@ hrm_vs_other %>%
 
 ```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
 
-sqft_vs_time <- listings %>%    
+sqft_vs_time <- listings_all %>%    
   filter(status %in% c("For Sale", "Sold"),
          between(sqft_mla, 450, 4000),
          !is.na(type))
@@ -207,7 +207,7 @@ sqft_plot <- sqft_vs_time %>%
   ggplot(aes(x = datetime, y = price/sqft_mla)) +
   geom_point(alpha = 0.2, aes(color = type)) +
   facet_grid(loc_bin ~ status, scales = "free_y") +
-  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01) +
+  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01, lwd = 0.3) +
   labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
   scale_color_viridis_d(option = "plasma", 
                         end = 6/9,
