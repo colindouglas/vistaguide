@@ -13,7 +13,7 @@ path = vp.next_filename("data/listings_")
 session = vp.Viewpoint(
     username=config['credentials']['username'],
     password=config['credentials']['password'],
-     headless=False
+    # headless=False
 )
 
 # Open the Dashboard for a text list
@@ -32,7 +32,7 @@ vp.wait('Opening relevant saved search', 3)
 session.scrape_all(out=path)
 
 # Get the failed URLs from yesterday
-yesterday = datetime.now() - timedelta(days=1)
+yesterday = datetime.now() - timedelta(days=0)
 failed_path = 'logs/{dt}_failed.log'.format(dt=yesterday.strftime('%Y%m%d'))
 urls = list()
 

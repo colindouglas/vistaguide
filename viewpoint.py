@@ -245,9 +245,14 @@ class Viewpoint(webdriver.Firefox):
 
     # This function takes a list of URLs and tries to scrape each one
     def scrape(self, urls, path):
+        urls = list(set(urls))  # Keep only the unique URLs
+
         # Printable pages are scraped using the vp.read() function
         # This is the trivial case of simply re-trying
         for url in urls:
+            if url in self.failed:
+                print('Already failed:', url)
+                continue
             if 'cutsheet' in url:
                 self.get(url)
                 self.read(path)

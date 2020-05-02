@@ -56,8 +56,9 @@ listings_all <- listings_all %>%
          status = factor(status, levels = names(status_colors)))
 
 listings <- listings_all %>%
+  arrange(datetime) %>%
   # Keep only the unique rows, because sometimes things get posted more than once
-  distinct(mls_no, price, status, .keep_all = TRUE)
+  distinct(mls_no, pid, price, status, .keep_all = TRUE)
 
 ```
 # Summary
@@ -114,7 +115,7 @@ listings %>%
 
 ```{r Status by Day, fig.width = 8, fig.height = 8}
 
-listings_all %>%
+listings %>%
   mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
   filter(!is.na(status)) %>%
   ggplot(aes(x = as_date(ymd_hms(datetime)))) +
@@ -135,7 +136,7 @@ listing_type <- c("For Sale" = "enter",
                   "Cancelled" = "exit", 
                   "Expired" = "exit")
 
-volume_changes <- listings_all %>%
+volume_changes <- listings %>%
   mutate(status_type = listing_type[status]) %>%
   filter(!is.na(status_type)) %>%
   group_by(date = as_date(datetime), status_type) %>%
@@ -157,7 +158,7 @@ volume_changes %>%
 ```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
 
 # Clean up the listings, bin each location into something meaningful
-hrm_vs_other <- listings_all %>%
+hrm_vs_other <- listings %>%
   filter(price < 1E6, between(sqft_mla, 450, 4000), # Nothing too fancy, thanks
          type %in% c("Single Family", "Condominium"))
 
@@ -193,7 +194,7 @@ hrm_vs_other %>%
 
 ```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
 
-sqft_vs_time <- listings_all %>%    
+sqft_vs_time <- listings %>%    
   filter(status %in% c("For Sale", "Sold"),
          between(sqft_mla, 450, 4000),
          !is.na(type))
@@ -221,7 +222,7 @@ suppressWarnings(print(sqft_plot))
 ## List Price vs. Sale Price and Re-List Price
 ```{r price changes over time, fig.width = 8, fig.height = 4}
 
-change_plot <- listings_all %>%
+change_plot <- listings %>%
   group_by(pid) %>%
   filter(n() > 1) %>%
   arrange(datetime) %>%
@@ -262,7 +263,7 @@ change_plot %>%
 
 ```{r Assessment vs. Sale Price, fig.width = 8, fig.height = 5}
 
-listings_all %>%
+listings %>%
   filter(status == "Sold",
          assessment < 1E6,
          assessment_year == "2020") %>%
@@ -360,14 +361,14 @@ listings_all %>%
 These are the 20 most recently-listed addresses that have a change. They don't necessarily have a "sold" entry in their history.
 
 ```{r Everything with Status Change, fig.width = 8, fig.height = 8}
-listings_with_change <- listings %>%
+listings_with_change <- listings_all %>%
   filter(status != "Pending") %>%
   group_by(pid) %>%
   distinct(status, price, .keep_all = TRUE) %>%
   filter(length(unique(status)) > 1) %>%
   pull(pid)
 
-close_order <- listings %>%
+close_order <- listings_all %>%
   filter(pid %in% listings_with_change) %>%
   group_by(address) %>%
   summarize(list_date = max(datetime)) %>%
