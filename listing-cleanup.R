@@ -3,6 +3,7 @@ library(lubridate)
 
 # Convert the weird CSVs that aren't formated right to TSVs
 source("csv_to_tsv.R")
+source("setup.R")
 
 # For x = 'prefix: data' return 'data'
 drop_prefix <- function(x, prefix) {
@@ -180,10 +181,36 @@ listings_u <- listings %>%
     address = str_replace(address, pattern = "Unit \\d+ ", ""),
     price = case_when(
       price < 10000 ~ price*100, # Catches bug where the last two digits of the price don't come through
-      TRUE ~ price)
-    )%>%
+      TRUE ~ price),
+    url = str_replace(url, pattern = "&print=1", replacement = "")
+    ) %>%
   # Split the address into a street and a city
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
+
+
+# Postal Code Cleanup -----------------------------------------------------
+
+# Read in list of postal codes
+fsa_ns <- read_csv("data/canada_fsa.csv", col_types = cols())  %>%
+  filter(`FSA-Province` == 12) %>% # NS
+  select(postal = PostalCode, postal_city = `Place Name`, area_type = AreaType) %>%
+  mutate(postal = paste(substring(postal, 1, 3), substring(postal, 4, 6)))
+
+
+# Location binning -------------------------------------------------------
+
+listings_u <- listings_u %>%
+  left_join(fsa_ns, by = "postal") %>%
+  mutate(peninsula = peninsula_codes[postal_first],
+         loc_bin = factor(
+           case_when(
+             postal_first %in% names(peninsula_codes) ~ "Halifax Peninsula",
+             postal_city == "Halifax" | city == "Halifax" ~ "Halifax, Off Peninsula",
+             postal_city == "Dartmouth" | city == "Dartmouth" ~ "Dartmouth",
+             postal_city %in% hrm_places | city %in% hrm_places ~ "HRM, Other",
+             TRUE ~ "Rest of Province"), 
+           levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
+
 
 # Where to write the output file
 path_out <- paste0("data/listings-clean.csv")
