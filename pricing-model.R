@@ -8,13 +8,14 @@ train_on_sold <- TRUE  # Train on "Sold", test on "For Sale"?
 
 listings <- read_csv("data/listings-clean.csv") %>%
   distinct(pid, status, .keep_all = TRUE) %>%
-  filter(price < 1000000, sqft_mla < 3000,
+  filter(price < 1000000, sqft_mla > 400,
          type %in% c("Single Family", "Condominium"),
          loc_bin != "Rest of Province") %>%
   rowwise() %>%
   mutate(sqft_dummy = max(0, (sqft_mla*mlaw + sqft_tla*(1-mlaw) - 750)),
          is_peninsula = loc_bin == "Halifax Peninsula",
-         condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla)) %>%
+         condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
+         assessment_thou = assessment/1000) %>%
   ungroup()
 
 
@@ -41,7 +42,7 @@ if (train_on_sold) {
 }
 
 
-complex_form <- price ~ loc_bin:(sqft_dummy + style) + building_age + days_on_market 
+complex_form <- price ~ loc_bin:(sqft_dummy + style ) + building_age  + days_on_market + assessment_thou
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)
@@ -74,7 +75,7 @@ dumb_model_fig <- test_set %>%
   geom_abline(slope = 1, intercept = 0, lty = 2) +
   scale_color_discrete(name = "") +
   scale_x_continuous(name = "Asking Price", labels = scales::dollar) +
-  scale_y_continuous(name = "Predicted Sale Price", labels = scales::dollar) +
+  scale_y_continuous(name = NULL, labels = NULL) +
   ggtitle("Dumb Model", 
           subtitle = paste0("RMS of Residuals: $", round(sqrt(mean(dumb_model$residuals^2)), 0)))
 

@@ -259,7 +259,7 @@ listings %>%
   arrange(-Count) %>%
   rename(`Listed City` = city)
 ```
-## Postal Codes That Describe Somewhere Else
+## Mismatched Postal Codes
 
 
 ```{r Check for messed up regions, rows.print = 10}
@@ -365,16 +365,7 @@ listings_all %>%
 
 ```
 
-## Listings on Gladstone
 
-```{r Listings at on Gladstone}
-listings_all %>%
-  filter(grepl("Gladstone", address)) %>%
-  mutate(date = as_date(datetime)) %>%
-  select(date, address=street, unit, price, condo_fee, url) %>%
-  arrange(date)
-
-```
 
 # Sale Price Model
 
@@ -382,9 +373,27 @@ listings_all %>%
 source("pricing-model.R")
 rows_print <- 15
 ```
+## Goodness of Fit
 The current 'complex model' is **`r paste(deparse(complex_form, width.cutoff = 500), collapse="")`**.
+
 ```{r, model figs, fig.width = 12, fig.height = 5}
+bind_cols(model = c("Dumb Model", "Complex Model"), 
+          bind_rows(
+  glance(dumb_model),
+  glance(complex_model)
+))
+
 model_figs
+```
+
+## Model Terms
+```{r model terms, rows.print = 20}
+broom::tidy(complex_model) %>%
+  mutate(estimate = scales::dollar(estimate),
+         term = str_replace(term, "loc_bin", "") %>%
+           str_replace(":style", " // ") %>%
+           str_replace(":sqft_dummy", " // sq.ft.")) %>%
+  select(-statistic, -std.error) 
 ```
 
 ## Asking Too Much
@@ -393,7 +402,7 @@ Top `r rows_print` overvalued properties from the last two weeks
 
 print_listing_table <- function(df) {
   df %>%
-  filter(list_date > today() - days(14)) %>%
+  filter(list_date > (today() - days(14))) %>%
   head(rows_print) %>%
   mutate(address_link = cell_spec(address, "html", link = url),
          value_score = round(xsv_z * 100),
@@ -401,7 +410,7 @@ print_listing_table <- function(df) {
          price =  scales::dollar(price)) %>%
     select(Address = address_link, 
            Location = loc_bin,
-         `Predicted Price` = complex_prd,
+         `Pred. Sale Price` = complex_prd,
          `Listing Price` = price,
          `Sq. Ft` = sqft_tla,
          `Value Score` = value_score) %>%
@@ -422,4 +431,13 @@ Top `r rows_print` undervalued properties from the last two weeks
 test_set %>%
   arrange(-xsv_z) %>%
   print_listing_table(.)
+```
+
+## Listings on Gladstone
+
+```{r Listings at on Gladstone}
+test_set %>%
+  filter(grepl("Gladstone", address)) %>%
+  print_listing_table(.)
+
 ```
