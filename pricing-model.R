@@ -15,8 +15,9 @@ listings <- read_csv("data/listings-clean.csv") %>%
   mutate(sqft_dummy = max(0, (sqft_mla*mlaw + sqft_tla*(1-mlaw) - 750)),
          is_peninsula = loc_bin == "Halifax Peninsula",
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
-         assessment_thou = assessment/1000) %>%
-  ungroup()
+         assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000)) %>%
+  ungroup() %>%
+  mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
 
 
 # Set up training and validation sets' ------------------------------------
@@ -42,7 +43,7 @@ if (train_on_sold) {
 }
 
 
-complex_form <- price ~ loc_bin:(sqft_dummy + style ) + building_age  + days_on_market + assessment_thou
+complex_form <- price ~ loc_bin:(sqft_dummy + style ) + building_age + days_on_market + assessment_in_thousands
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)

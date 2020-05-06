@@ -402,13 +402,18 @@ Top `r rows_print` overvalued properties from the last two weeks
 
 print_listing_table <- function(df) {
   df %>%
-  filter(list_date > (today() - days(14))) %>%
-  head(rows_print) %>%
   mutate(address_link = cell_spec(address, "html", link = url),
          value_score = round(xsv_z * 100),
          complex_prd = scales::dollar(complex_prd),
-         price =  scales::dollar(price)) %>%
-    select(Address = address_link, 
+         price =  scales::dollar(price),
+         loc_bin = case_when(
+           loc_bin == "Halifax Peninsula" ~ "Peninsula",
+           loc_bin == "HRM, Other" ~ "HRM",
+           loc_bin == "Halifax, Off Peninsula" ~ "Halifax",
+           TRUE ~ loc_bin
+         )) %>%
+    select(`List Date` = list_date,
+           Address = address_link, 
            Location = loc_bin,
          `Pred. Sale Price` = complex_prd,
          `Listing Price` = price,
@@ -421,6 +426,8 @@ print_listing_table <- function(df) {
 
 test_set %>%
   arrange(xsv_z) %>%
+  filter(list_date > (today() - days(14))) %>%
+  head(rows_print) %>%
   print_listing_table(.)
 ```
 
@@ -430,6 +437,8 @@ Top `r rows_print` undervalued properties from the last two weeks
 
 test_set %>%
   arrange(-xsv_z) %>%
+    filter(list_date > (today() - days(14))) %>%
+  head(rows_print) %>%
   print_listing_table(.)
 ```
 
@@ -437,7 +446,21 @@ test_set %>%
 
 ```{r Listings at on Gladstone}
 test_set %>%
+  arrange(desc(list_date)) %>%
   filter(grepl("Gladstone", address)) %>%
   print_listing_table(.)
+
+```
+
+## Listings on the Peninsula
+
+```{r Listings on the Peninsula}
+test_set %>%
+  arrange(desc(list_date)) %>%
+  filter(loc_bin == "Halifax Peninsula") %>%
+  head(15) %>%
+  print_listing_table(.)
+
+```
 
 ```
