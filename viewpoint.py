@@ -139,11 +139,14 @@ class Viewpoint(webdriver.Firefox):
         listing = BeautifulSoup(self.page_source, 'html.parser')
 
         # Take "ViewPoint.ca" out of the title
-        title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()
+        try:
+            title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()
+        except AttributeError:
+            title = ""
 
         # Sometimes the cutsheets aren't served properly, if that happens, bail
-        if len(title) <= 10:
-            wait_msg = 'Address <{title}> is suspiciously short. Skipping {url}'
+        if len(title) <= 10 or title is 'about:blank':
+            wait_msg = '<{title}>: Address failed to load. Skipping {url}'
             wait(wait_msg.format(title=title, url=self.current_url), 5)
             self.record_failure(self.current_url)
             return None
