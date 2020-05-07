@@ -211,6 +211,9 @@ listings_u <- listings_u %>%
              TRUE ~ "Rest of Province"), 
            levels = c("Halifax Peninsula", "Halifax, Off Peninsula", "Dartmouth", "HRM, Other", "Rest of Province")))
 
+# Sometimes the listings are "Sold" but they haven't closed yet, count those as "Pending"
+listings_u$status[is.na(listings_u$price)] <- "Pending"
+
 
 # Where to write the output file
 path_out <- paste0("data/listings-clean.csv")

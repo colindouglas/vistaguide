@@ -145,7 +145,7 @@ class Viewpoint(webdriver.Firefox):
             title = ""
 
         # Sometimes the cutsheets aren't served properly, if that happens, bail
-        if len(title) <= 10 or title is 'about:blank':
+        if len(title) <= 10 or title == 'about:blank':
             wait_msg = '<{title}>: Address failed to load. Skipping {url}'
             wait(wait_msg.format(title=title, url=self.current_url), 5)
             self.record_failure(self.current_url)
@@ -203,7 +203,11 @@ class Viewpoint(webdriver.Firefox):
             for i, listing in enumerate(listings):
                 wait('Starting property #{p} on page {page}'.format(p=i+1, page=current_page), 2)
                 # Try to open the window for each listing
-                window_opened = self.open(listing)
+                try:
+                    window_opened = self.open(listing)
+                except sce.WebDriverException:
+                    wait('Failed to open listing popup window', 4)
+                    continue
 
                 # If the window was opened, read the window
                 if window_opened:

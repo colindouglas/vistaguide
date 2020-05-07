@@ -1,10 +1,10 @@
 library(tidyverse)
-library(tidymodels)
 library(patchwork)
 source("setup.R")
 
 mlaw <- 0.5  # Weighting for MLA sqft number
-train_on_sold <- TRUE  # Train on "Sold", test on "For Sale"?
+train_on <- "sold" # One of "sold", "everything", or a fraction < 1.0
+
 
 listings <- read_csv("data/listings-clean.csv") %>%
   distinct(pid, status, .keep_all = TRUE) %>%
@@ -15,35 +15,44 @@ listings <- read_csv("data/listings-clean.csv") %>%
   mutate(sqft_dummy = max(0, (sqft_mla*mlaw + sqft_tla*(1-mlaw) - 750)),
          is_peninsula = loc_bin == "Halifax Peninsula",
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
-         assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000)) %>%
+         assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000),
+         #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
+         ) %>%
   ungroup() %>%
   mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
 
 
 # Set up training and validation sets' ------------------------------------
-if (train_on_sold) {
-  
+
+# Train on "Sold" listings, test against "for sale" listings
+if (train_on == "sold") {
   training_set <- listings %>%
     filter(status == "Sold")
   
   test_set <- listings %>%
     filter(status == "For Sale") %>%
     distinct(address, .keep_all = TRUE)
+  # Train against everything, test against everything
+} else if (train_on == "everything") {
+  test_set <- training_set <- listings
   
-} else {
-  
+  # Train on some fraction, then test on the remaining
+} else if (is.numeric(train_on) & between(train_on, 0.5, 1)) {
   training_set <- listings %>%
     filter(status %in% c("For Sale", "Sold")) %>%
-    sample_frac(size = 0.75)
+    sample_frac(size = train_on)
   
   test_set <- listings %>%
     filter(status %in% c("For Sale", "Sold")) %>%
     anti_join(training_set)
   
+  
+} else {
+  error("Don't know how to train like that!")
 }
 
 
-complex_form <- price ~ loc_bin:(sqft_dummy + style ) + building_age + days_on_market + assessment_in_thousands
+complex_form <- price ~ loc_bin*(sqft_dummy + style + days_on_market) + building_age  + assessment_in_thousands
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)
