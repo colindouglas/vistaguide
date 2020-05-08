@@ -31,6 +31,7 @@ vp.wait('Opening relevant saved search', 3)
 # Scrape all of the lines
 session.scrape_all(out=path)
 
+vp.wait('Starting yesterday\'s failures', 3)
 # Get the failed URLs from yesterday
 yesterday = datetime.now() - timedelta(days=0)
 failed_path = 'logs/{dt}_failed.log'.format(dt=yesterday.strftime('%Y%m%d'))

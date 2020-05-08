@@ -192,7 +192,7 @@ class Viewpoint(webdriver.Firefox):
         while bool(next_button):
             # Find all the different properties on the index page by matching the text on their buttons
             listings = list()
-            button_strings = ['Entered', 'day on market', 'days on market', 'null']  # Find buttons with this text
+            button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
             for button_string in button_strings:
                 listings = listings + self.find_elements_by_partial_link_text(button_string)
             wait('Found {n} links on page {p}'.format(n=len(listings),

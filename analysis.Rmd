@@ -418,24 +418,25 @@ Top `r rows_print` overvalued properties from the last two weeks
 
 print_listing_table <- function(df) {
   df %>%
-  mutate(address_link = cell_spec(street,"html", link = url),
-         value_score = round(xsv_z * 100),
-         complex_prd = scales::dollar(complex_prd),
-         price =  scales::dollar(price),
-         loc_bin = case_when(
-           postal_first %in% names(peninsula_codes) ~ peninsula_codes[postal_first],
-           !is.na(postal_city) ~ postal_city,
-           TRUE ~ city
-         )) %>%
+    mutate(street = ifelse(is.na(unit), street, paste0(unit, "-", street)),
+           address_link = cell_spec(street,"html", link = url),
+           value_score = round(xsv_z * 100),
+           complex_prd = scales::dollar(complex_prd),
+           price =  scales::dollar(price),
+           loc_bin = case_when(
+             postal_first %in% names(peninsula_codes) ~ peninsula_codes[postal_first],
+             !is.na(postal_city) ~ postal_city,
+             TRUE ~ city
+           )) %>%
     select(`List Date` = list_date,
            Address = address_link, 
            Location = loc_bin,
-         `Pred. Sale Price` = complex_prd,
-         `Listing Price` = price,
-         `Sq. Ft` = sqft_tla,
-         `Value Score` = value_score) %>%
-  kable("html", escape = FALSE) %>%
-  kable_styling(bootstrap_options = c("hover", "condensed"))
+           `Pred. Sale Price` = complex_prd,
+           `Listing Price` = price,
+           `Sq. Ft` = sqft_tla,
+           `Value Score` = value_score) %>%
+    kable("html", escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("hover", "condensed"))
   
 }
 
@@ -452,7 +453,7 @@ Top `r rows_print` undervalued properties from the last two weeks
 
 test_set %>%
   arrange(-xsv_z) %>%
-    filter(list_date > (today() - days(14))) %>%
+  filter(list_date > (today() - days(14))) %>%
   head(rows_print) %>%
   print_listing_table(.)
 ```
@@ -478,4 +479,3 @@ test_set %>%
 
 ```
 
-```
