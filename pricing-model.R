@@ -7,7 +7,7 @@ train_on <- "sold" # One of "sold", "everything", or a fraction < 1.0
 
 
 listings <- read_csv("data/listings-clean.csv") %>%
-  distinct(pid, status, .keep_all = TRUE) %>%
+  distinct(pid, status, price, .keep_all = TRUE) %>%
   filter(price < 1000000, sqft_mla > 400,
          type %in% c("Single Family", "Condominium"),
          loc_bin != "Rest of Province") %>%
@@ -16,6 +16,7 @@ listings <- read_csv("data/listings-clean.csv") %>%
          is_peninsula = loc_bin == "Halifax Peninsula",
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
          assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000),
+         #desc_words = str_count(description, '\\w+'),
          #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
          ) %>%
   ungroup() %>%
