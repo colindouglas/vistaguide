@@ -1,6 +1,8 @@
 library(tidyverse)
 library(patchwork)
 source("setup.R")
+# source("sentiment-analysis.R") # For using prices predicted by the sentiment of the description. Not useful
+
 
 mlaw <- 0.5  # Weighting for MLA sqft number
 train_on <- "sold" # One of "sold", "everything", or a fraction < 1.0
@@ -16,11 +18,12 @@ listings <- read_csv("data/listings-clean.csv") %>%
          is_peninsula = loc_bin == "Halifax Peninsula",
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
          assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000),
-         #desc_words = str_count(description, '\\w+'),
+         #desc_words = str_count(description, '\\w+'), # Words in description, not useful
          #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
          ) %>%
   ungroup() %>%
-  mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
+  mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age)) %>%
+  left_join(desc_scores, by = "pid")
 
 
 # Set up training and validation sets' ------------------------------------
