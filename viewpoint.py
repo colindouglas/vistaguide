@@ -10,7 +10,7 @@ import time
 import os
 from numpy import random as npr
 
-
+############ THIS IS THE LOGGING BRANCH ################
 # Function to randomly wait while printing a message about why it's waiting
 # Wait times are normally distributed
 def wait(message: chr = '', mean: float = 2, sd: float = 1) -> None:
