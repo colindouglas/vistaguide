@@ -72,6 +72,8 @@ class Viewpoint(webdriver.Firefox):
 
         # List of URLS that failed
         self.failed = list()
+        self.worked = list()
+        self.index_window = None
 
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
@@ -99,51 +101,63 @@ class Viewpoint(webdriver.Firefox):
     # A function to click on a property 'button' (found via Selenium) and change focus to the popup
     # It then clicks on the 'print' button, closes the original popup, and changes focus to the print window
     # The print window is much easier to scrape than the 'pretty' version that pops up originally
-    def open(self, button):
-        self.logger.debug('Clicking on property button')
+    def navigate_to_printable(self, button):
+
+        self.logger.debug('Navigating to printable property screen')
         self.implicitly_wait(5)
+
         # Remember which window is focused at the start
         self.index_window = self.current_window_handle
         self.logger.debug('Remembering index window: ' + str(self.index_window))
 
-        # Shift click in the button
+        # Shift click in the button to open it in a new window
+        self.logger.debug('Handles before Shift+Click: ' + str(self.window_handles))
         ActionChains(self).key_down(Keys.SHIFT).click(button).key_up(Keys.SHIFT).perform()
-        self.logger.debug('Shift+clicked on property button')
+        self.logger.debug('Handles after Shift+Click: ' + str(self.window_handles))
         self.explicitly_wait(2)
 
-        # If there's a newly opened window, switch to it
-        self.logger.debug('Currently open windows: ' + str(self.window_handles))
+        # Check if a new window opened up
+        self.logger.debug("Checking for new popup window...")
         new_window = list({x for x in self.window_handles} - {self.index_window})
-        self.logger.debug('New window index: ' + str(new_window))
+
         if new_window:
-            self.logger.debug('Switching focus to popup window: ' + str(new_window[0]))
+            self.logger.debug('Found new window: ' + str(new_window))
             self.switch_to.window(new_window[0])
             self.log_windows()
             self.implicitly_wait(5)
+            popup_url = self.current_url
+        else:
+            self.logger.warning('No popup window detected')
+            self.log_windows()
+            return False
 
         # If it's failed previously, skip it
         if self.current_url in self.failed:
-            self.logger.debug('URL has already failed. Skipping ' + self.current_url)
+            self.logger.info('URL already failed. Skipping ' + self.current_url)
             self.implicitly_wait(5)
             return False
 
-        # Click on the print button
+        # If it's already been scraped today, skip it
+        if self.current_url in self.worked:
+            self.logger.info('URL already scraped. Skipping ' + self.current_url)
+            self.implicitly_wait(5)
+            return False
+
+        # Click on the print button and close the pretty window
+        self.logger.debug('Looking for a print button...')
         try:
-            self.logger.debug('Clicked on print button')
             self.find_element_by_class_name('cutsheet-print').click()
+            self.logger.debug('Detected a print button and clicked.')
+            self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.close()
             self.explicitly_wait(2)
         except sce.NoSuchElementException:
-            self.logger.debug('No print button detected. Skipping ' + self.current_url)
+            self.logger.warning('No print button detected. Skipping ' + self.current_url)
             self.record_failure(self.current_url)
             self.implicitly_wait(5)
-            self.logger.debug('Closing window {0}: {1}'.format(self.current_window_handle, self.current_url))
-            self.close() #New
+            self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.close()
             return False
-
-        # Close the 'pretty' window because we're going to scrape from the printable window
-        self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
-        self.close()
-        self.implicitly_wait(2)
 
         # Switch context to the printable page
         try:
@@ -151,6 +165,7 @@ class Viewpoint(webdriver.Firefox):
             self.switch_to.window(new_window)
             self.logger.debug('Focused on print window {0}: {1}'.format(self.current_window_handle, self.current_url))
             self.implicitly_wait(5)
+            self.worked.append(popup_url)
             return True
         except (IndexError, sce.WebDriverException):
             self.logger.warning('Couldn\'t open window. Skipping ' + self.current_url)
@@ -231,6 +246,7 @@ class Viewpoint(webdriver.Firefox):
             # Find all the different properties on the index page by matching the text on their buttons
             listings = list()
             button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
+            self.explicitly_wait(3)  # Wait to prevent duplicates
             for button_string in button_strings:
                 listings = listings + self.find_elements_by_partial_link_text(button_string)
             self.logger.info('Found {n} links on page {p}'.format(n=len(listings),
@@ -244,23 +260,24 @@ class Viewpoint(webdriver.Firefox):
                 self.implicitly_wait(2)
                 # Try to open the window for each listing
                 try:
-                    window_opened = self.open(listing)
+                    window_opened = self.navigate_to_printable(listing)
                 except sce.WebDriverException:
+                    window_opened = False
                     self.logger.warning(
                         'Failed to open property #{p} on page {page}'.format(p=i + 1, page=current_page)
                     )
                     self.implicitly_wait(4)
-                    continue
 
-                # Read the property, close the window
-                self.read(out=out)
-                self.close()
-                self.logger.debug('Finished with property #{p} on page {page}'.format(p=i + 1, page=current_page))
-                self.implicitly_wait(5)
+                # If the window was successfully opened, read the listing
+                if window_opened:
+                    self.read(out=out)
+                    self.close()
+                    self.logger.debug('Finished with property #{p} on page {page}'.format(p=i + 1, page=current_page))
+                    self.implicitly_wait(5)
 
                 # Switch back to the index to prepare for the next listing
-                self.switch_to.window(index_window)
-                self.logger.debug('Switched to index window ' + str(index_window))
+                self.switch_to.window(self.index_window)
+                self.logger.debug('Switched to index window ' + str(self.index_window))
                 self.implicitly_wait(2)
 
             # Switch back to the index window
@@ -274,7 +291,7 @@ class Viewpoint(webdriver.Firefox):
                 self.logger.debug('Switching to page {page}'.format(page=current_page))
                 self.implicitly_wait(5)
             else:  # If we're on the last page, print a message and stop
-                self.logger.info('All finished after page' + str(current_page))
+                self.logger.info('All finished after page ' + str(current_page))
                 break
 
     # Check if there's a next button on this page

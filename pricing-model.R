@@ -17,7 +17,8 @@ listings <- read_csv("data/listings-clean.csv") %>%
   mutate(sqft_dummy = max(0, (sqft_mla*mlaw + sqft_tla*(1-mlaw) - 750)),
          is_peninsula = loc_bin == "Halifax Peninsula",
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
-         assessment_in_thousands = ifelse(is.na(assessment), 0, assessment/1000),
+         assessment_in_thousands = ifelse(is.na(assessment) | assessment > 2E6, 0, assessment/1000),
+         is_nice = grepl("69", address) | grepl("69", unit),
          #desc_words = str_count(description, '\\w+'), # Words in description, not useful
          #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
          ) %>%
@@ -34,7 +35,7 @@ if (train_on == "sold") {
   
   test_set <- listings %>%
     filter(status == "For Sale") %>%
-    distinct(address, .keep_all = TRUE)
+    distinct(mls_no, pid, .keep_all = TRUE)
   # Train against everything, test against everything
 } else if (train_on == "everything") {
   test_set <- training_set <- listings
@@ -55,7 +56,7 @@ if (train_on == "sold") {
 }
 
 
-complex_form <- price ~ loc_bin*(sqft_dummy + style + days_on_market) + building_age  + assessment_in_thousands
+complex_form <- price ~ loc_bin*(sqft_dummy + style + days_on_market) + building_age  + assessment_in_thousands + is_nice
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)

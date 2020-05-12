@@ -418,7 +418,8 @@ Top `r rows_print` overvalued properties from the last two weeks
 
 print_listing_table <- function(df) {
   df %>%
-    mutate(street = ifelse(is.na(unit), street, paste0(unit, "-", street)),
+    mutate(scrape_date = as_date(datetime),
+      street = ifelse(is.na(unit), street, paste0(unit, "-", street)),
            address_link = cell_spec(street,"html", link = url),
            value_score = round(xsv_z * 100),
            complex_prd = scales::dollar(complex_prd),
@@ -428,7 +429,7 @@ print_listing_table <- function(df) {
              !is.na(postal_city) ~ postal_city,
              TRUE ~ city
            )) %>%
-    select(`List Date` = list_date,
+    select(`Date` = scrape_date,
            Address = address_link, 
            Location = loc_bin,
            `Pred. Sale Price` = complex_prd,
@@ -462,7 +463,7 @@ test_set %>%
 
 ```{r Listings at on Gladstone}
 test_set %>%
-  arrange(desc(list_date)) %>%
+  arrange(desc(datetime)) %>%
   filter(grepl("Gladstone", address)) %>%
   print_listing_table(.)
 
@@ -472,7 +473,7 @@ test_set %>%
 
 ```{r Listings on the Peninsula}
 test_set %>%
-  arrange(desc(list_date)) %>%
+  arrange(desc(datetime)) %>%
   filter(loc_bin == "Halifax Peninsula" | loc_bin %in% peninsula_codes) %>%
   head(15) %>%
   print_listing_table(.)

@@ -2,9 +2,18 @@ from configparser import ConfigParser
 import viewpoint as vp
 from datetime import datetime, timedelta
 
-# Read credentials from config file (./config.txt)
+
+# Read credentials from config file
 config = ConfigParser()
 config.read('config.txt')
+
+# ./config.txt should be a text file with the structure:
+'''
+[credentials]
+
+username = YOUR_email@domain.com
+password = hunter2
+'''
 
 # Find the next available filename
 path = vp.next_filename("data/listings_")
@@ -45,12 +54,13 @@ try:
         for line in log:
             urls.append(line)
 except FileNotFoundError:
-    print("No failures found from yesterday!")
+    session.logger.info("No failures found from yesterday!")
 
 # Scrape each of the URLs from the list of failures
 # If there are URLs in it, try each one
 if len(urls) > 0:
     session.scrape(urls, path)
+    session.logger.info("Finished with yesterday's failures")
 
 # Close everything at the end
 session.quit()

@@ -1,9 +1,11 @@
 #!/usr/bin/bash
 
+# Set the working directory
+wd=~/projects/viewpointer/
 today=$(date +''%Y%m%d'')
 
-# Working directory
-cd /home/colin/projects/viewpointer/
+
+cd ${wd}
 
 # Python script to scrape the data from Viewpoint
 venv/bin/python3 -u get-withinday-listings.py 2>&1 | tee -a logs/console/"${today}".log
