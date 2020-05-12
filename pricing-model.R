@@ -22,8 +22,7 @@ listings <- read_csv("data/listings-clean.csv") %>%
          #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
          ) %>%
   ungroup() %>%
-  mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age)) %>%
-  left_join(desc_scores, by = "pid")
+  mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
 
 
 # Set up training and validation sets' ------------------------------------

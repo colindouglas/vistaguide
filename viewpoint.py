@@ -12,13 +12,6 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 from numpy.random import normal as rand_norm
 
-'''
-This is the logging branch. Its goal is to implement logging via the logging module and
-use the 'implicit wait' function of selenium to speed up the scraping. Hopefully
-with proper logging, I can troubleshoot the memory leak in the program
-'''
-
-
 # Finds the next unused filename with the format baseYYYMMDDI.csv
 # e.g., listing-202004051.csv for the second output of April 5, 2020
 def next_filename(base: chr = 'listing_') -> chr:
@@ -37,17 +30,23 @@ class Viewpoint(webdriver.Firefox):
 
         # Setup the logger
         self.logger = logging.getLogger('viewpointer')
-        self.logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)7s - %(name)s - %(levelname)s - %(message)s')
-        #fh = logging.FileHandler(log)
+
+        # Write a log file for everything DEBUG and up
+        self.logger.setLevel(logging.DEBUG)
+
+        # Rotate the log files at midnight, keep up to 7
         fh = TimedRotatingFileHandler(filename=log, when='midnight', backupCount=7)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
+
+        # Only output INFO and up to the console
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
         ch.setLevel(logging.INFO)
         self.logger.addHandler(ch)
-        self.logger.debug('Initializing Viewpoint')
+
+        self.logger.debug('Initializing Viewpointer session')
         self.logger.debug('Logging to ' + str(log))
 
         # Set a Firefox profile so the print window doesn't mess things up
@@ -55,6 +54,7 @@ class Viewpoint(webdriver.Firefox):
         profile = webdriver.FirefoxProfile()
         profile.set_preference("print.always_print_silent", True)
         profile.set_preference("print.show_print_progress", False)
+        self.logger.debug('Starting up Firefox')
 
         # Run Firefox headless so it can hide in the background
         options = Options()
@@ -76,11 +76,11 @@ class Viewpoint(webdriver.Firefox):
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
         self.set_window_size(1920, 1080)
-        self.logger.info('Starting Firefox')
+        self.logger.debug('Changed Firefox window size')
         self.implicitly_wait(5)
 
         # Open the login URL and log in
-        self.logger.info('Opening Viewpoint login URL: ' + str(_LOGIN_URL))
+        self.logger.debug('Opening Viewpoint login URL: ' + str(_LOGIN_URL))
         self.get(_LOGIN_URL)
         self.implicitly_wait(2)
 
@@ -90,6 +90,7 @@ class Viewpoint(webdriver.Firefox):
         self.find_element_by_name('password').send_keys(password)
         self.find_element_by_class_name('big').click()
         self.implicitly_wait(5)
+        self.logger.debug('Successfully logged in')
 
     def __str__(self):
         # Print the window title
@@ -365,17 +366,18 @@ class Viewpoint(webdriver.Firefox):
     # at level 'DEBUG'. It starts with the focused window, and switched back
     # to the focused window at the end
     def log_windows(self):
-        start = self.current_window_handle
-        self.logger.debug('*** CURRENTLY OPEN WINDOWS ***')
-        self.logger.debug('Window {0} (focus): {1}'.format(self.current_window_handle, self.current_url))
-        for window in self.window_handles:
-            if window == start:
-                continue
-            self.switch_to.window(window)
-            self.logger.debug('Window {0}: {1}'.format(self.current_window_handle, self.current_url))
-            self.implicitly_wait(2)
-        self.switch_to.window(start)
-        self.logger.debug('Done of window logging, swtiching back to {0}'.format(start))
+        start_window = self.current_window_handle
+        window_dict = {
+            self.current_window_handle: "focus",
+            self.index_window: "index",
+        }
+        self.logger.debug('Window {0} ({1}): {2}'.format(
+            self.current_window_handle,
+            window_dict.setdefault(self.current_window_handle, "unknown"),
+            self.current_url))
+        self.implicitly_wait(2)
+        self.switch_to.window(start_window)
+        self.logger.debug('Done of window logging, switching back to {0}'.format(start_window))
 
 
 
