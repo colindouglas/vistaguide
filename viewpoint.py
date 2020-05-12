@@ -8,20 +8,15 @@ from bs4 import BeautifulSoup
 import re
 import time
 import os
-from numpy import random as npr
+import logging
+from logging.handlers import TimedRotatingFileHandler
+from numpy.random import normal as rand_norm
 
-############ THIS IS THE LOGGING BRANCH ################
-# Function to randomly wait while printing a message about why it's waiting
-# Wait times are normally distributed
-def wait(message: chr = '', mean: float = 2, sd: float = 1) -> None:
-    wt = npr.normal(loc=mean, scale=sd)
-    if wt < 0.5:
-        wt = 1 - wt
-    print('[{dt}] Waiting for {:.1f} secs: {message}'.format(wt,
-                                                             message=message,
-                                                             dt=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    time.sleep(wt)
-    return None
+'''
+This is the logging branch. Its goal is to implement logging via the logging module and
+use the 'implicit wait' function of selenium to speed up the scraping. Hopefully
+with proper logging, I can troubleshoot the memory leak in the program
+'''
 
 
 # Finds the next unused filename with the format baseYYYMMDDI.csv
@@ -38,7 +33,22 @@ def next_filename(base: chr = 'listing_') -> chr:
 class Viewpoint(webdriver.Firefox):
     # Function to start the web scraper and login with a username and password
     # Returns the Selenium driver object, which gets passed to subsequent functions
-    def __init__(self, username, password, headless=True):
+    def __init__(self, username, password, headless=True, log='logs/viewpointer.log'):
+
+        # Setup the logger
+        self.logger = logging.getLogger('viewpointer')
+        self.logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)7s - %(name)s - %(levelname)s - %(message)s')
+        #fh = logging.FileHandler(log)
+        fh = TimedRotatingFileHandler(filename=log, when='midnight', backupCount=7)
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        ch.setLevel(logging.INFO)
+        self.logger.addHandler(ch)
+        self.logger.debug('Initializing Viewpoint')
+        self.logger.debug('Logging to ' + str(log))
 
         # Set a Firefox profile so the print window doesn't mess things up
         # I'm not sure if this is necessary in headless mode but it doesn't break it so whatever
@@ -50,10 +60,12 @@ class Viewpoint(webdriver.Firefox):
         options = Options()
         if headless:
             options.headless = True
+            self.logger.debug('Running headless')
+        else:
+            self.logger.debug('Not running headless')
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
         # Init the webdriver with the options and Firefox profile defined above
-        # If 'geckodriver' isn't in the path, just an explicitly location
         super().__init__(profile,
                          options=options,
                          log_path='logs/geckodriver.log')
@@ -64,17 +76,20 @@ class Viewpoint(webdriver.Firefox):
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
         self.set_window_size(1920, 1080)
-        wait('Starting Firefox', 5)
+        self.logger.info('Starting Firefox')
+        self.implicitly_wait(5)
 
         # Open the login URL and log in
+        self.logger.info('Opening Viewpoint login URL: ' + str(_LOGIN_URL))
         self.get(_LOGIN_URL)
-        wait('Opening Viewpoint login', 2)
+        self.implicitly_wait(2)
 
         # Fill in username and password and click on the button
+        self.logger.info('Logging in with username \'{0}\''.format(username))
         self.find_element_by_name('email').send_keys(username)
         self.find_element_by_name('password').send_keys(password)
         self.find_element_by_class_name('big').click()
-        wait('Logging in to Viewpoint', 5)
+        self.implicitly_wait(5)
 
     def __str__(self):
         # Print the window title
@@ -84,46 +99,64 @@ class Viewpoint(webdriver.Firefox):
     # It then clicks on the 'print' button, closes the original popup, and changes focus to the print window
     # The print window is much easier to scrape than the 'pretty' version that pops up originally
     def open(self, button):
+        self.logger.debug('Clicking on property button')
+        self.implicitly_wait(5)
         # Remember which window is focused at the start
-        index_window = self.current_window_handle
+        self.index_window = self.current_window_handle
+        self.logger.debug('Remembering index window: ' + str(self.index_window))
 
         # Shift click in the button
         ActionChains(self).key_down(Keys.SHIFT).click(button).key_up(Keys.SHIFT).perform()
-        wait('Shift+clicked on property button', 5)
+        self.logger.debug('Shift+clicked on property button')
+        self.explicitly_wait(2)
 
         # If there's a newly opened window, switch to it
-        new_window = list({x for x in self.window_handles} - {index_window})
+        self.logger.debug('Currently open windows: ' + str(self.window_handles))
+        new_window = list({x for x in self.window_handles} - {self.index_window})
+        self.logger.debug('New window index: ' + str(new_window))
         if new_window:
+            self.logger.debug('Switching focus to popup window: ' + str(new_window[0]))
             self.switch_to.window(new_window[0])
-            wait('Switched focus to popup window', 5)
+            self.log_windows()
+            self.implicitly_wait(5)
 
         # If it's failed previously, skip it
         if self.current_url in self.failed:
-            wait('URL has already failed. Skipping ' + self.current_url, 2)
+            self.logger.debug('URL has already failed. Skipping ' + self.current_url)
+            self.implicitly_wait(5)
             return False
 
         # Click on the print button
         try:
+            self.logger.debug('Clicked on print button')
             self.find_element_by_class_name('cutsheet-print').click()
-            wait('Clicked on print button', 2)
+            self.explicitly_wait(2)
         except sce.NoSuchElementException:
-            wait('No print button! Skipping ' + self.current_url, 5)
+            self.logger.debug('No print button detected. Skipping ' + self.current_url)
             self.record_failure(self.current_url)
+            self.implicitly_wait(5)
+            self.logger.debug('Closing window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.close() #New
             return False
 
         # Close the 'pretty' window because we're going to scrape from the printable window
+        self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
         self.close()
-        wait('Closed pretty window', 2)
+        self.implicitly_wait(2)
 
         # Switch context to the printable page
         try:
-            new_window = list({x for x in self.window_handles} - {index_window})[0]
+            new_window = list({x for x in self.window_handles} - {self.index_window})[0]
             self.switch_to.window(new_window)
-            wait('Switched focus to printable window', 5)
+            self.logger.debug('Focused on print window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.implicitly_wait(5)
             return True
         except (IndexError, sce.WebDriverException):
-            wait('Couldn\'t open window. Skipping ' + self.current_url, 5)
+            self.logger.warning('Couldn\'t open window. Skipping ' + self.current_url)
+            self.implicitly_wait(5)
             self.record_failure(self.current_url)
+            self.logger.debug('Closing window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.close()
             return False
 
     # This is the function that does all of the scraping and writes it to the path in 'out'
@@ -132,7 +165,8 @@ class Viewpoint(webdriver.Firefox):
     def read(self, out='data/listings.csv'):
 
         if self.current_url in self.failed:
-            wait('URL has already failed. Skipping ' + self.current_url, 2)
+            self.logger.debug('URL has already failed. Skipping ' + self.current_url)
+            self.implicitly_wait(2)
             return None
 
         # Run the listing page source through beautiful soup
@@ -143,20 +177,21 @@ class Viewpoint(webdriver.Firefox):
             title = re.sub(' - ViewPoint.ca', '', listing.title.text).strip()
         except AttributeError:
             title = ""
+            self.logger.warning('No page title found')
 
         # Sometimes the cutsheets aren't served properly, if that happens, bail
         if len(title) <= 10 or title == 'about:blank':
             wait_msg = '<{title}>: Address failed to load. Skipping {url}'
-            wait(wait_msg.format(title=title, url=self.current_url), 5)
+            self.logger.warning(wait_msg.format(title=title, url=self.current_url))
+            self.implicitly_wait(5)
             self.record_failure(self.current_url)
             return None
-
-        print('[{dt}] Scraping <{prop}>...'.format(prop=title,
-                                                   dt=datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        self.logger.info('Scraping <{prop}>...'.format(prop=title))
         try:
             desc = listing.find("div", {"class": "row-fluid printsmall"}).text.strip()
         except AttributeError:
             desc = "Missing description"
+            self.logger.warning('Missing description for <{0}>'.format(title))
 
         # Record the time and the title of the window (which contains address and postal code)
         listing_row = [str(datetime.now()), title, self.current_url, desc]
@@ -171,12 +206,14 @@ class Viewpoint(webdriver.Firefox):
         with open(out, 'a') as file:
             tsv = '\t'.join(listing_row)
             file.write(tsv)
-        wait('Finished scraping', 5)
+        self.logger.debug('Successfully scraped <{0}>'.format(title))
+        self.implicitly_wait(5)
 
     # This function goes through the listings in an index and scrapes them all and writes to the path in 'out'
     # The first argument (driver) should be a Selenium driver that is currently focused on the index
     # of a search or a dashboard. Pagination is handled in here as well.
     def scrape_all(self, out='data/listings.csv', handle=None):
+        self.logger.debug('Scraping all listings...')
         current_page = 1  # Page counter
         next_button = True  # Next button
 
@@ -195,29 +232,35 @@ class Viewpoint(webdriver.Firefox):
             button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
             for button_string in button_strings:
                 listings = listings + self.find_elements_by_partial_link_text(button_string)
-            wait('Found {n} links on page {p}'.format(n=len(listings),
-                                                      p=current_page
-                                                      ), 5)
+            self.logger.info('Found {n} links on page {p}'.format(n=len(listings),
+                                                                  p=current_page
+                                                                  ))
+            self.implicitly_wait(5)
 
             # Click on each of the buttons and scrape the resulting data
             for i, listing in enumerate(listings):
-                wait('Starting property #{p} on page {page}'.format(p=i+1, page=current_page), 2)
+                self.logger.debug('Starting property #{p} on page {page}'.format(p=i + 1, page=current_page))
+                self.implicitly_wait(2)
                 # Try to open the window for each listing
                 try:
                     window_opened = self.open(listing)
                 except sce.WebDriverException:
-                    wait('Failed to open listing popup window', 4)
+                    self.logger.warning(
+                        'Failed to open property #{p} on page {page}'.format(p=i + 1, page=current_page)
+                    )
+                    self.implicitly_wait(4)
                     continue
 
-                # If the window was opened, read the window
-                if window_opened:
-                    self.read(out=out)
-                    self.close()
-                    wait('Finished with property #{p} on page {page}'.format(p=i+1, page=current_page), 5)
+                # Read the property, close the window
+                self.read(out=out)
+                self.close()
+                self.logger.debug('Finished with property #{p} on page {page}'.format(p=i + 1, page=current_page))
+                self.implicitly_wait(5)
 
                 # Switch back to the index to prepare for the next listing
                 self.switch_to.window(index_window)
-                wait('Switched to index window', 2)
+                self.logger.debug('Switched to index window ' + str(index_window))
+                self.implicitly_wait(2)
 
             # Switch back to the index window
             self.switch_to.window(index_window)
@@ -227,9 +270,10 @@ class Viewpoint(webdriver.Firefox):
             if bool(next_button):
                 next_button.click()
                 current_page += 1
-                wait('Switching to page {page}'.format(page=current_page), 5)
+                self.logger.debug('Switching to page {page}'.format(page=current_page))
+                self.implicitly_wait(5)
             else:  # If we're on the last page, print a message and stop
-                print('All finished after page', current_page)
+                self.logger.info('All finished after page' + str(current_page))
                 break
 
     # Check if there's a next button on this page
@@ -237,16 +281,19 @@ class Viewpoint(webdriver.Firefox):
     def next_button(self):
         try:
             out = self.find_element_by_link_text('NEXT »')
+            self.logger.debug('Found next button on ' + str(self.current_url))
         except sce.NoSuchElementException:
             out = False
-            wait('No next button detected. Must be done!')
+            self.logger.debug('No next button detected. Must be done!')
+            self.implicitly_wait(2)
         return out
 
     # If a URL doesn't work, record it to a log file and within the Viewpoint object
     def record_failure(self, url, path=None):
         if path is None:
             path = 'logs/{dt}_failed.log'.format(dt=datetime.now().strftime('%Y%m%d'))
-        self.failed.append(self.current_url)
+        self.failed.append(url)
+        self.logger.warning('Recording failed url: ' + str(url))
         with open(path, 'a') as file:
             file.write(url + '\n')
 
@@ -273,20 +320,24 @@ class Viewpoint(webdriver.Firefox):
                 # Try to click on the print button
                 try:
                     self.find_element_by_class_name('cutsheet-print').click()
-                    wait('Clicked on print button', 2)
+                    self.logger.debug('Clicked on print button')
+                    self.implicitly_wait(2)
                 except sce.NoSuchElementException:
-                    wait('No print button! Skipping ' + self.current_url, 5)
+                    self.logger.warning('No print button! Skipping ' + self.current_url)
+                    self.implicitly_wait(5)
                     self.record_failure(self.current_url)
                     continue
 
                 # Switch context to the printable page
                 try:
                     new_window = list({x for x in self.window_handles} - {main_window})[0]
-                    print("Windows open:", self.window_handles)
+                    self.logger.debug("Windows open:", self.window_handles)
                     self.switch_to.window(new_window)
-                    wait('Switched focus to printable window', 5)
+                    self.logger.debug('Switched focus to printable window')
+                    self.implicitly_wait(5)
                 except (IndexError, sce.WebDriverException):
-                    wait('Couldn\'t open window. Skipping ' + self.current_url, 5)
+                    self.logger.warning('Couldn\'t open window. Skipping ' + self.current_url)
+                    self.implicitly_wait(5)
                     self.record_failure(self.current_url)
                     continue
 
@@ -295,4 +346,38 @@ class Viewpoint(webdriver.Firefox):
                 self.switch_to.window(main_window)
                 self.close()
             else:
-                print('Don\'t know how to handle:', url)
+                self.logger.warning('Don\'t know how to handle:' + url)
+
+    def implicitly_wait_rand(self, min_):
+        st_dev = 1
+        wt = abs(rand_norm(loc=0, scale=st_dev))
+        self.implicitly_wait(wt)
+        return None
+
+    def explicitly_wait(self, min_):
+        st_dev = 2
+        wt = abs(rand_norm(loc=0, scale=st_dev)) + min_
+        self.logger.debug('Explicitly waiting {0:.1f} secs'.format(wt))
+        time.sleep(wt)
+        return None
+
+    # This function logs the windows that are currently open to the logger
+    # at level 'DEBUG'. It starts with the focused window, and switched back
+    # to the focused window at the end
+    def log_windows(self):
+        start = self.current_window_handle
+        self.logger.debug('*** CURRENTLY OPEN WINDOWS ***')
+        self.logger.debug('Window {0} (focus): {1}'.format(self.current_window_handle, self.current_url))
+        for window in self.window_handles:
+            if window == start:
+                continue
+            self.switch_to.window(window)
+            self.logger.debug('Window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.implicitly_wait(2)
+        self.switch_to.window(start)
+        self.logger.debug('Done of window logging, swtiching back to {0}'.format(start))
+
+
+
+
+

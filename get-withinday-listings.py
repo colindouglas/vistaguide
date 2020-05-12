@@ -13,25 +13,27 @@ path = vp.next_filename("data/listings_")
 session = vp.Viewpoint(
     username=config['credentials']['username'],
     password=config['credentials']['password'],
-    # headless=False
+    headless=True
 )
 
 # Open the Dashboard for a text list
+session.logger.debug('Opening the dashboard')
 session.find_element_by_link_text('DASHBOARD').click()
-vp.wait('Opening dashboard', 5)
+session.explicitly_wait(5)
 
 # Click on the 'Saved Searches' link
+session.logger.debug('Opening saved searches')
 session.find_element_by_link_text('SAVED SEARCHES').click()
-vp.wait('Opening Saved Searches index', 3)
+session.explicitly_wait(5)
 
 # Open the previously saved 'Halifax in the Last Week' search
 session.find_element_by_partial_link_text('Everything WithinDay').click()
-vp.wait('Opening relevant saved search', 3)
+session.implicitly_wait(3)
 
 # Scrape all of the lines
 session.scrape_all(out=path)
 
-vp.wait('Starting yesterday\'s failures', 3)
+session.logger.info('Starting yesterday\'s failures')
 # Get the failed URLs from yesterday
 yesterday = datetime.now() - timedelta(days=0)
 failed_path = 'logs/{dt}_failed.log'.format(dt=yesterday.strftime('%Y%m%d'))
