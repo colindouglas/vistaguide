@@ -312,7 +312,7 @@ class Viewpoint(webdriver.Firefox):
     # If a URL doesn't work, record it to a log file and within the Viewpoint object
     def record_failure(self, url, path=None):
         if path is None:
-            path = 'logs/{dt}_failed.log'.format(dt=datetime.now().strftime('%Y%m%d'))
+            path = 'logs/failed/{dt}.log'.format(dt=yesterday.strftime('%Y%m%d'))
         self.failed.append(url)
         self.logger.warning('Recording failed url: ' + str(url))
         with open(path, 'a') as file:
@@ -330,12 +330,14 @@ class Viewpoint(webdriver.Firefox):
                 continue
             if 'cutsheet' in url:
                 self.get(url)
+                self.explicitly_wait(2)
                 self.read_printable(path)
 
         # If the URL is the path to a 'pretty' listing page, we need to switch to the printable version first
         # This adds a lot more steps
             elif 'property' in url:
                 self.get(url)
+                self.explicitly_wait(2)
                 main_window = self.current_window_handle
                 # --- Switch to the printable window
                 # Try to click on the print button
