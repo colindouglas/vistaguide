@@ -1,7 +1,7 @@
 ---
 title: "Halifax Listings"
 author: "Colin Douglas"
-date: "Created: 6-Apr-2020"
+date: "Created 6-Apr-2020"
 output: 
   html_document:
     toc: true
@@ -34,7 +34,9 @@ listings <- listings_all %>%
            type == "Single Family" ~ "Single Family", 
            type %in% c("Duplex", "Triplex", "Fourplex") ~ "Multiplex",
            grepl("unit", type, ignore.case = TRUE) ~ "Multiplex",
-           TRUE ~ word(type, 1)))
+           TRUE ~ word(type, 1)),
+         street_address = address,
+         address = ifelse(is.na(unit), address, paste0(unit, "-", address)))
 
 ```
 # Summary
@@ -47,20 +49,20 @@ This dataset contains **`r nrow(listings_all)` data points** on **`r listings$ml
 
 top_20_cities <- listings %>% 
   distinct(mls_no, .keep_all = TRUE) %>%
-  filter(!is.na(postal_city), 
+  filter(!is.na(city), 
          !is.na(type),
          status == "For Sale") %>%
-  count(postal_city) %>%
+  count(city) %>%
   arrange(-n) %>%
   head(20) %>%
-  pull(postal_city)
+  pull(city)
 
 listings %>%
-  filter(postal_city %in% top_20_cities,
+  filter(city %in% top_20_cities,
          !is.na(type),
          status %in% c("For Sale", "Sold")) %>%
   distinct(mls_no, status, .keep_all = TRUE) %>%
-  mutate(postal_city = factor(postal_city, levels = top_20_cities)) %>%
+  mutate(postal_city = factor(city, levels = top_20_cities)) %>%
   ggplot(aes(x = postal_city)) +
   geom_bar(aes(fill = type)) +
   facet_wrap(~ status, ncol = 1) +
@@ -99,14 +101,15 @@ listings %>%
   facet_grid(status ~ .) +
   xlab("Date Scraped") +
   scale_y_continuous(name = "Count") +
-  geom_text(aes(y = count + max(count) * 0.075 * sign(count), label = count))
+  geom_text(aes(y = count + max(count) * 0.075 * sign(count), label = count), size = 2)
 ```
 
 ## Changes in Inventory
 This figure shows the net change in inventory in a given day. It is calculated as new listings with a status of "For Sale" minus the sum of new listings with the statuses "Sold", "Expired", "Withdrawn", and "Cancelled". Listings with a status of "Pending" are ignored.
-```{r Balance in Listings}
+```{r Balance in Listings, fig.width = 10, fig.height = 4}
 listing_type <- c("For Sale" = "enter", 
                   "Sold" = "exit", 
+                  "Defunct" = "exit",
                   "Pending" = NA, 
                   "Withdrawn" = "exit", 
                   "Cancelled" = "exit", 
@@ -134,8 +137,8 @@ listings %>%
   ggplot(aes(x = date, y = count)) +
   geom_col(aes(fill = status), na.rm = TRUE) +
   scale_fill_manual(values = status_colors, guide = FALSE) +
-  geom_text(data = volume_changes, aes(y = enter + max(enter) * 0.075, label = enter)) +
-  geom_text(data = volume_changes, aes(y = -(exit + max(exit) * 0.075), label = exit)) +
+  geom_text(data = volume_changes, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
+  geom_text(data = volume_changes, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes, aes(y = zoo::rollmean(net_change, 7, na.pad=TRUE, align = "right")), lty = 2, na.rm = TRUE) +
   labs(x = "Date", y = "Net Change in Active Listings")
 
@@ -264,33 +267,6 @@ listings %>%
               lty = c(2, 3, 3, 3, 3))
 ```
 
-# Postal Codes
-
-In the dataset, `r (sum(is.na(listings$postal_city)) / nrow(listings) * 100) %>% round(1)`% of the listings have postal codes that don't exist, according to Canada Post. In the dataset, `r (sum(listings$city != listings$postal_city, na.rm = TRUE) / nrow(listings) * 100) %>% round(1)`% of the listings have valid postal codes but the listing address doesn't match the postal code. Here are the disagreements with more than two occurances.
-
-## Postal Codes That Don't Exist
-
-```{r Postal codes that dont exist, rows.print = 10}
-listings %>%
-  filter(is.na(postal_city)) %>%
-  group_by(city) %>%
-  summarize(Count = n(),
-            `Postal Codes` = str_trunc(paste(postal, collapse = ", "), 70)) %>%
-  arrange(-Count) %>%
-  rename(`Listed City` = city)
-```
-## Mismatched Postal Codes
-
-
-```{r Check for messed up regions, rows.print = 10}
-listings %>%
-  filter(city != postal_city) %>%
-  count(city, postal_city) %>%
-  arrange(-n) %>%
-  rename(`Listing City` = city,
-         `City from Postal Code` = postal_city,
-         Count = n) 
-```
 # Listing-Level Analysis
 ## Changes in Price
 
@@ -307,7 +283,7 @@ listings_with_change <- listings %>%
 
 close_order <- listings %>%
   filter(pid %in% listings_with_change) %>%
-  group_by(address) %>%
+  group_by(pid, address) %>%
   summarize(list_date = max(datetime)) %>%
   arrange(list_date) %>%
   pull(address) %>%
@@ -430,7 +406,6 @@ print_listing_table <- function(df) {
            price =  scales::dollar(price),
            loc_bin = case_when(
              postal_first %in% names(peninsula_codes) ~ peninsula_codes[postal_first],
-             !is.na(postal_city) ~ postal_city,
              TRUE ~ city
            )) %>%
     select(`Date` = scrape_date,

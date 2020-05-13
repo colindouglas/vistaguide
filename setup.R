@@ -7,6 +7,12 @@ hrm_places <- c("Halifax", "Dartmouth", "Bedford", "Lower Sackville", "Hammonds 
                 "Beaver Bank", "Timberlea", "Middle Sackville", "Upper Sackville",
                 "Lucasville", "Fall River", "Spryfield")
 
+hrm_postals <- c(
+  paste0("B2", LETTERS[22:26]),
+  paste0("B3", LETTERS),
+  paste0("B4", LETTERS[1:7])
+)
+
 status_colors <- c("For Sale" = "#3288bd", # Blue
                    "Pending" =  "#fdae61", # Yellow
                    "Sold" = "#5aae61", # Green
