@@ -14,7 +14,7 @@ path = vp.next_filename("data/listings_")
 session = vp.Viewpoint(
     username=config['credentials']['username'],
     password=config['credentials']['password'],
-    headless=False
+    headless=True
 )
 
 session.explicitly_wait(5)
@@ -42,3 +42,5 @@ if len(urls) > 0:
     session.logger.info("Renaming: {0} >> {0}.done".format(failed_path))
 
 
+# Close everything at the end
+session.quit()

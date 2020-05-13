@@ -312,7 +312,7 @@ class Viewpoint(webdriver.Firefox):
     # If a URL doesn't work, record it to a log file and within the Viewpoint object
     def record_failure(self, url, path=None):
         if path is None:
-            path = 'logs/failed/{dt}.log'.format(dt=yesterday.strftime('%Y%m%d'))
+            path = 'logs/failed/{dt}.log'.format(dt=datetime.now().strftime('%Y%m%d'))
         self.failed.append(url)
         self.logger.warning('Recording failed url: ' + str(url))
         with open(path, 'a') as file:
