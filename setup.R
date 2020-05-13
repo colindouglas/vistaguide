@@ -12,4 +12,5 @@ status_colors <- c("For Sale" = "#3288bd", # Blue
                    "Sold" = "#5aae61", # Green
                    "Cancelled" = "#d53e4f", # Less dark red
                    "Withdrawn" = "#9e0142", # Dark Red
+                   "Defunct" = "#6a3d9a", # Purple
                    "Expired" = "darkgrey")

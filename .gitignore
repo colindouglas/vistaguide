@@ -9,3 +9,4 @@ config.txt
 /logs/
 *.html
 /analysis_files
+update-public.sh

@@ -40,7 +40,7 @@ session.find_element_by_partial_link_text('Everything WithinDay').click()
 session.implicitly_wait(3)
 
 # Scrape all of the lines
-session.scrape_all(out=path)
+session.scrape_index(out=path)
 
 session.logger.info('Starting yesterday\'s failures')
 # Get the failed URLs from yesterday
@@ -54,12 +54,12 @@ try:
         for line in log:
             urls.append(line)
 except FileNotFoundError:
-    session.logger.info("No failures found from yesterday!")
+    session.logger.info("No failures found in path: {0}".format(failed_path))
 
 # Scrape each of the URLs from the list of failures
 # If there are URLs in it, try each one
 if len(urls) > 0:
-    session.scrape(urls, path)
+    session.scrape_urls(urls, path)
     session.logger.info("Finished with yesterday's failures")
 
 # Close everything at the end

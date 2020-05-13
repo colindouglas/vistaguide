@@ -1,7 +1,7 @@
 ---
 title: "Halifax Listings"
 author: "Colin Douglas"
-date: "6-Apr-2020"
+date: "Created: 6-Apr-2020"
 output: 
   html_document:
     toc: true
@@ -25,11 +25,16 @@ source("setup.R")
 listings_all <- read_csv("data/listings-clean.csv", col_types = cols())
 
 listings <- listings_all %>%
-  filter(!is.na(type)) %>%
+  filter(!is.na(type), !is.na(status)) %>%
   arrange(datetime) %>%
   # Keep only the unique rows, because sometimes things get posted more than once
   distinct(mls_no, pid, price, status, .keep_all = TRUE) %>%
-  mutate(status = factor(status, levels = names(status_colors)))
+  mutate(status = factor(status, levels = names(status_colors)),
+         type = case_when(
+           type == "Single Family" ~ "Single Family", 
+           type %in% c("Duplex", "Triplex", "Fourplex") ~ "Multiplex",
+           grepl("unit", type, ignore.case = TRUE) ~ "Multiplex",
+           TRUE ~ word(type, 1)))
 
 ```
 # Summary
@@ -55,12 +60,11 @@ listings %>%
          !is.na(type),
          status %in% c("For Sale", "Sold")) %>%
   distinct(mls_no, status, .keep_all = TRUE) %>%
-  mutate(postal_city = factor(postal_city, levels = top_20_cities),
-         type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
+  mutate(postal_city = factor(postal_city, levels = top_20_cities)) %>%
   ggplot(aes(x = postal_city)) +
   geom_bar(aes(fill = type)) +
   facet_wrap(~ status, ncol = 1) +
-  scale_fill_viridis_d(option = "plasma", name = "") +
+  scale_fill_brewer(name = "", palette = "Set1", direction = -1) +
   scale_x_discrete(name = "") +
   scale_y_continuous(name = "Listing Count") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
@@ -72,12 +76,11 @@ listings %>%
 
 listings %>%
   distinct(mls_no, .keep_all = TRUE) %>%
-  mutate(type = ifelse(type == "Single Family", "Single Family", word(type, 1))) %>%
   filter(ymd(list_date) > ymd("2020-04-01"), 
          status == "For Sale") %>%
   ggplot(aes(x = ymd(list_date))) +
   geom_bar(aes(fill = type), position = "stack", width = 0.9) +
-  scale_fill_viridis_d(option = "plasma", end = 8/9, name = "") +
+  scale_fill_brewer(name = "", palette = "Set1", direction = -1) +
   xlab("List Date") +
   scale_y_continuous(name = "Count")
 ```
@@ -169,7 +172,7 @@ hrm_vs_other %>%
   labs(color = "", x = "Square Footage (MLS)", y = "List Price") +
   facet_grid(loc_bin ~ type) +
   scale_color_viridis_c(option = "plasma", 
-                        direction = -1,
+                        direction = 1,
                         name = "Days Since\n2020-04-01") +
   scale_y_continuous(labels = scales::dollar) +
   geom_smooth(method = "lm", formula = y ~ x, na.rm = TRUE, color = "darkgrey")
@@ -187,15 +190,16 @@ sqft_vs_time <- listings %>%
 
 svt_fit <- sqft_vs_time %>%
   group_by(status, type, loc_bin) %>%
-  filter(n() > 10)
+  filter(n() > 20)
 
 
 sqft_plot <- svt_fit  %>% 
   ggplot(aes(x = datetime, y = price/sqft_mla)) +
-  geom_point(alpha = 0.2, aes(color = type)) +
+  geom_point(alpha = 0.1, aes(color = type)) +
   facet_grid(loc_bin ~ status, scales = "free_y") +
   geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01, lwd = 0.5) +
-  labs(x = "List Date", y = "$/Sq. Ft.", color = "")
+  labs(x = "List Date", y = "$/Sq. Ft.", color = "") +
+  scale_color_brewer(name = "", palette = "Set1", direction = -1)
 
 suppressWarnings(print(sqft_plot))
 

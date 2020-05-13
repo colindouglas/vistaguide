@@ -35,12 +35,12 @@ class Viewpoint(webdriver.Firefox):
         # Write a log file for everything DEBUG and up
         self.logger.setLevel(logging.DEBUG)
 
-        # Rotate the log files at midnight, keep up to 7
+        # Rotate the log files at midnight, keep a week's worth of logging
         fh = TimedRotatingFileHandler(filename=log, when='midnight', backupCount=7)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 
-        # Only output INFO and up to the console
+        # For console output, only print INFO and up
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
         ch.setLevel(logging.INFO)
@@ -56,7 +56,7 @@ class Viewpoint(webdriver.Firefox):
         profile.set_preference("print.show_print_progress", False)
         self.logger.debug('Starting up Firefox')
 
-        # Run Firefox headless so it can hide in the background
+        # Run Firefox headless so it can hide in the background and not steal focus
         options = Options()
         if headless:
             options.headless = True
@@ -70,10 +70,9 @@ class Viewpoint(webdriver.Firefox):
                          options=options,
                          log_path='logs/geckodriver.log')
 
-        # List of URLS that failed
-        self.failed = list()
-        self.worked = list()
-        self.index_window = None
+        self.failed = list()  # URLs that have failed
+        self.worked = list()  # URLs that have worked
+        self.index_window = None  # The window handle of the "index" window with all the listings
 
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
@@ -98,9 +97,11 @@ class Viewpoint(webdriver.Firefox):
         # Print the window title
         return 'Viewpoint: ' + BeautifulSoup(self.page_source, 'html.parser').title.text.strip()
 
-    # A function to click on a property 'button' (found via Selenium) and change focus to the popup
-    # It then clicks on the 'print' button, closes the original popup, and changes focus to the print window
-    # The print window is much easier to scrape than the 'pretty' version that pops up originally
+    ''' 
+    A function to click on a property 'button' (found via Selenium) and change focus to the popup
+    It then clicks on the 'print' button, closes the original popup, and changes focus to the print window
+    The print window is much easier to scrape than the 'pretty' version that pops up originally
+    '''
     def navigate_to_printable(self, button):
 
         self.logger.debug('Navigating to printable property screen')
@@ -148,16 +149,14 @@ class Viewpoint(webdriver.Firefox):
         try:
             self.find_element_by_class_name('cutsheet-print').click()
             self.logger.debug('Detected a print button and clicked.')
-            self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
-            self.close()
-            self.explicitly_wait(2)
         except sce.NoSuchElementException:
             self.logger.warning('No print button detected. Skipping ' + self.current_url)
             self.record_failure(self.current_url)
-            self.implicitly_wait(5)
-            self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
-            self.close()
             return False
+        finally:
+            self.close()
+            self.logger.debug('Closed pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
+            self.explicitly_wait(2)
 
         # Switch context to the printable page
         try:
@@ -175,13 +174,17 @@ class Viewpoint(webdriver.Firefox):
             self.close()
             return False
 
-    # This is the function that does all of the scraping and writes it to the path in 'out'
-    # The first argument is a Selenium driver that is currently focused on a the "Print"
-    # view of a listing. The print view is much easier to scrape than the initial view
-    def read(self, out='data/listings.csv'):
+    '''
+    This is the function that does all of the scraping and writes it to the path in 'out'
+    It should be called on a Selenium driver that is currently focused on a the "Print"
+    view of a listing. The print view is much easier to scrape than the initial view
+    '''
 
+    def read_printable(self, out='data/listings.csv'):
+
+        # If it's already failed, don't bother trying it
         if self.current_url in self.failed:
-            self.logger.debug('URL has already failed. Skipping ' + self.current_url)
+            self.logger.info('URL has already failed. Skipping ' + self.current_url)
             self.implicitly_wait(2)
             return None
 
@@ -228,7 +231,7 @@ class Viewpoint(webdriver.Firefox):
     # This function goes through the listings in an index and scrapes them all and writes to the path in 'out'
     # The first argument (driver) should be a Selenium driver that is currently focused on the index
     # of a search or a dashboard. Pagination is handled in here as well.
-    def scrape_all(self, out='data/listings.csv', handle=None):
+    def scrape_index(self, out='data/listings.csv', handle=None):
         self.logger.debug('Scraping all listings...')
         current_page = 1  # Page counter
         next_button = True  # Next button
@@ -270,7 +273,7 @@ class Viewpoint(webdriver.Firefox):
 
                 # If the window was successfully opened, read the listing
                 if window_opened:
-                    self.read(out=out)
+                    self.read_printable(out=out)
                     self.close()
                     self.logger.debug('Finished with property #{p} on page {page}'.format(p=i + 1, page=current_page))
                     self.implicitly_wait(5)
@@ -316,18 +319,18 @@ class Viewpoint(webdriver.Firefox):
             file.write(url + '\n')
 
     # This function takes a list of URLs and tries to scrape each one
-    def scrape(self, urls, path):
+    def scrape_urls(self, urls, path):
         urls = list(set(urls))  # Keep only the unique URLs
 
         # Printable pages are scraped using the vp.read() function
         # This is the trivial case of simply re-trying
         for url in urls:
             if url in self.failed:
-                print('Already failed:', url)
+                self.logger.info('Already failed:', url)
                 continue
             if 'cutsheet' in url:
                 self.get(url)
-                self.read(path)
+                self.read_printable(path)
 
         # If the URL is the path to a 'pretty' listing page, we need to switch to the printable version first
         # This adds a lot more steps
@@ -360,28 +363,30 @@ class Viewpoint(webdriver.Firefox):
                     continue
 
                 # --- End of switching to printable window
-                self.read(path)
+                self.read_printable(path)
                 self.switch_to.window(main_window)
                 self.close()
             else:
                 self.logger.warning('Don\'t know how to handle:' + url)
 
+    # Implicitly wait a normally distributed amount of time above 'min_'
     def implicitly_wait_rand(self, min_):
         st_dev = 1
         wt = abs(rand_norm(loc=0, scale=st_dev))
+        self.logger.debug('Implicitly waiting {0:.1f} secs'.format(wt))
         self.implicitly_wait(wt)
         return None
 
-    def explicitly_wait(self, min_):
+    # Explicitly wait a normally distributed amount of time above 'shortest'
+    def explicitly_wait(self, shortest):
         st_dev = 2
-        wt = abs(rand_norm(loc=0, scale=st_dev)) + min_
+        wt = abs(rand_norm(loc=0, scale=st_dev)) + shortest
         self.logger.debug('Explicitly waiting {0:.1f} secs'.format(wt))
         time.sleep(wt)
         return None
 
-    # This function logs the windows that are currently open to the logger
-    # at level 'DEBUG'. It starts with the focused window, and switched back
-    # to the focused window at the end
+    # This function logs the windows that are currently open to the logger at level 'DEBUG'.
+    # It starts with the focused window, and switched back to the focused window at the end
     def log_windows(self):
         start_window = self.current_window_handle
         window_dict = {
