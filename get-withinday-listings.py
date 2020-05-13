@@ -38,7 +38,7 @@ session.find_element_by_partial_link_text('Everything WithinDay').click()
 session.implicitly_wait(3)
 
 # Scrape all of the lines
-session.scrape_index(out=path)
+session.scrape_index()
 
 # Close everything at the end
 session.quit()

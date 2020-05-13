@@ -26,7 +26,10 @@ def next_filename(base: chr = 'listing_') -> chr:
 class Viewpoint(webdriver.Firefox):
     # Function to start the web scraper and login with a username and password
     # Returns the Selenium driver object, which gets passed to subsequent functions
-    def __init__(self, username, password, headless=True, log='logs/viewpointer.log'):
+    def __init__(self, username, password, headless=True,
+                 log='logs/viewpointer.log',
+                 out_path=None,
+                 fail_path=None):
 
         # Setup the logger
         self.logger = logging.getLogger('viewpointer')
@@ -63,6 +66,18 @@ class Viewpoint(webdriver.Firefox):
             self.logger.debug('Running headless')
         else:
             self.logger.debug('Not running headless')
+
+        if not out_path:
+            self.out_path = next_filename("data/listings_")
+        else:
+            self.out_path = out_path
+        self.logger.info("Scraping data to " + self.out_path)
+
+        if not fail_path:
+            self.fail_path = 'logs/failed/{dt}.log'.format(dt=datetime.now().strftime('%Y%m%d'))
+        else:
+            self.fail_path = fail_path
+        self.logger.info("Recording failures to " + self.fail_path)
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
         # Init the webdriver with the options and Firefox profile defined above
@@ -231,7 +246,7 @@ class Viewpoint(webdriver.Firefox):
     # This function goes through the listings in an index and scrapes them all and writes to the path in 'out'
     # The first argument (driver) should be a Selenium driver that is currently focused on the index
     # of a search or a dashboard. Pagination is handled in here as well.
-    def scrape_index(self, out='data/listings.csv', handle=None):
+    def scrape_index(self, handle=None):
         self.logger.debug('Scraping all listings...')
         current_page = 1  # Page counter
         next_button = True  # Next button
@@ -273,7 +288,7 @@ class Viewpoint(webdriver.Firefox):
 
                 # If the window was successfully opened, read the listing
                 if window_opened:
-                    self.read_printable(out=out)
+                    self.read_printable(out=self.out_path)
                     self.close()
                     self.logger.debug('Finished with property #{p} on page {page}'.format(p=i + 1, page=current_page))
                     self.implicitly_wait(5)
@@ -312,14 +327,14 @@ class Viewpoint(webdriver.Firefox):
     # If a URL doesn't work, record it to a log file and within the Viewpoint object
     def record_failure(self, url, path=None):
         if path is None:
-            path = 'logs/failed/{dt}.log'.format(dt=datetime.now().strftime('%Y%m%d'))
+            path = self.fail_path
         self.failed.append(url)
         self.logger.warning('Recording failed url: ' + str(url))
         with open(path, 'a') as file:
             file.write(url + '\n')
 
     # This function takes a list of URLs and tries to scrape each one
-    def scrape_urls(self, urls, path):
+    def scrape_urls(self, urls):
         urls = list(set(urls))  # Keep only the unique URLs
 
         # Printable pages are scraped using the vp.read() function
@@ -331,7 +346,7 @@ class Viewpoint(webdriver.Firefox):
             if 'cutsheet' in url:
                 self.get(url)
                 self.explicitly_wait(2)
-                self.read_printable(path)
+                self.read_printable(self.out_path)
 
         # If the URL is the path to a 'pretty' listing page, we need to switch to the printable version first
         # This adds a lot more steps
@@ -365,7 +380,7 @@ class Viewpoint(webdriver.Firefox):
                     continue
 
                 # --- End of switching to printable window
-                self.read_printable(path)
+                self.read_printable(self.out_path)
                 self.switch_to.window(main_window)
                 self.close()
             else:
