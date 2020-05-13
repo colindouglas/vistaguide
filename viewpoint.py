@@ -47,7 +47,7 @@ class Viewpoint(webdriver.Firefox):
         self.logger.addHandler(ch)
 
         self.logger.debug('Initializing Viewpointer session')
-        self.logger.debug('Logging to ' + str(log))
+        self.logger.info('Logging to ' + str(log))
 
         # Set a Firefox profile so the print window doesn't mess things up
         # I'm not sure if this is necessary in headless mode but it doesn't break it so whatever
@@ -154,8 +154,8 @@ class Viewpoint(webdriver.Firefox):
             self.record_failure(self.current_url)
             return False
         finally:
+            self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
             self.close()
-            self.logger.debug('Closed pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
             self.explicitly_wait(2)
 
         # Switch context to the printable page

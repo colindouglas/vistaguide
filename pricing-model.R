@@ -19,6 +19,12 @@ listings <- read_csv("data/listings-clean.csv") %>%
          condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
          assessment_in_thousands = ifelse(is.na(assessment) | assessment > 2E6, 0, assessment/1000),
          is_nice = grepl("69", address) | grepl("69", unit),
+         style_bin = case_when(
+           style %in% c("Condo Apartment") ~ "Apartment",
+           style %in% c("Townhouse", "Condo Townhouse", "Semi-Detached") ~ "Shared Wall",
+           style %in% c("Detached") ~ "Detached",
+           TRUE ~ style
+         )
          #desc_words = str_count(description, '\\w+'), # Words in description, not useful
          #loc_bin = ifelse(loc_bin == "Halifax Peninsula", peninsula_codes[postal_first], loc_bin) # Split the peninsula into smaller areas
          ) %>%
@@ -55,8 +61,7 @@ if (train_on == "sold") {
   error("Don't know how to train like that!")
 }
 
-
-complex_form <- price ~ loc_bin*(sqft_dummy + style + days_on_market) + building_age  + assessment_in_thousands + is_nice
+complex_form <- price ~ loc_bin*(sqft_dummy + days_on_market) + style_bin + building_age  + assessment_in_thousands + is_nice
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)
