@@ -36,7 +36,7 @@ except FileNotFoundError:
 # Scrape each of the URLs from the list of failures
 # If there are URLs in it, try each one
 if len(urls) > 0:
-    session.scrape_urls(urls, path)
+    session.scrape_urls(urls)
     session.logger.info("Finished with yesterday's failures")
     os.rename(failed_path, failed_path + ".done")
     session.logger.info("Renaming: {0} >> {0}.done".format(failed_path))
