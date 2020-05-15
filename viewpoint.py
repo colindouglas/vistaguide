@@ -315,6 +315,8 @@ class Viewpoint(webdriver.Firefox):
     # Check if there's a next button on this page
     # Return the button object if it exists, otherwise return false
     def next_button(self):
+        # When we're clicking on the "next" button, the only window we need is the index
+        self.close_leftover_windows()
         try:
             out = self.find_element_by_link_text('NEXT »')
             self.logger.debug('Found next button on ' + str(self.current_url))
@@ -417,6 +419,17 @@ class Viewpoint(webdriver.Firefox):
         self.implicitly_wait(2)
         self.switch_to.window(start_window)
         self.logger.debug('Done of window logging, switching back to {0}'.format(start_window))
+
+    # Closes every window except the index window (with the handle self.index_window)
+    def close_leftover_windows(self):
+        self.logger.debug('Open windows: ' + str(self.window_handles))
+        self.logger.debug('Closing leftover windows...')
+        for window in self.window_handles:
+            if window != self.index_window:
+                self.switch_to.window(window)
+                self.close()
+        self.switch_to.window(self.index_window)
+        self.logger.debug('Open windows: ' + str(self.window_handles))
 
 
 
