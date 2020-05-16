@@ -16,7 +16,7 @@ listings <- read_csv("data/listings-clean.csv") %>%
   rowwise() %>%
   mutate(sqft_dummy = max(0, (sqft_mla*mlaw + sqft_tla*(1-mlaw) - 750)),
          is_peninsula = loc_bin == "Halifax Peninsula",
-         condo_fee_sqft = ifelse(is.na(condo_fee), 0, condo_fee/sqft_mla),
+         condo_fee = ifelse(is.na(condo_fee), 0, condo_fee),
          assessment_in_thousands = ifelse(is.na(assessment) | assessment > 2E6, 0, assessment/1000),
          is_nice = grepl("69", address) | grepl("69", unit),
          style_bin = case_when(

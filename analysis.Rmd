@@ -2,24 +2,22 @@
 title: "Halifax Listings"
 author: "Colin Douglas"
 date: "Created 6-Apr-2020"
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    df_print: paged
-    code_folding: hide
+always_allow_html: true
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(fig.path="figures/")
+
 library(tidyverse)
 library(lubridate)
 library(kableExtra)
 library(broom)
 source("setup.R")
 ```
-**Last Updated** `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 
+**Last Updated** `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 ```{r Read in data, define regions}
 
 listings_all <- read_csv("data/listings-clean.csv", col_types = cols())
@@ -44,7 +42,6 @@ This dataset contains **`r nrow(listings_all)` data points** on **`r listings$ml
 
 # Volume
 ## Where are the Listings?
-
 ```{r Listing Location, fig.width = 8, fig.height = 6}
 
 top_20_cities <- listings %>% 
@@ -73,7 +70,6 @@ listings %>%
 ```
 
 ## When are they Being Listed
-
 ```{r When are the listings, fig.width = 8, fig.height = 4}
 
 listings %>%
@@ -88,7 +84,6 @@ listings %>%
 ```
 
 ## Listing By Status Per Day
-
 ```{r Status by Day, fig.width = 8, fig.height = 8}
 
 listings %>%
@@ -144,7 +139,6 @@ listings %>%
 
 ```
 
-
 # Pricing
 ## Per Square Foot in Different Regions
 ```{r Price per Area on vs. Off, fig.width=8, fig.height=8}
@@ -183,7 +177,6 @@ hrm_vs_other %>%
 ```
 
 ## Price Trends by Listing Type
-
 ```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 8}
 
 sqft_vs_time <- listings %>%    
@@ -211,7 +204,6 @@ suppressWarnings(print(sqft_plot))
 
 ## Sale Price and Re-List Price
 ```{r price changes over time, fig.width = 8, fig.height = 4}
-
 change_plot <- listings %>%
   group_by(pid) %>%
   filter(n() > 1) %>%
@@ -225,7 +217,6 @@ change_labels <- change_plot %>%
   filter(datetime > now() - weeks(1),
          status %in% c("Sold", "For Sale")) %>%
   summarize(mean_change = mean(price_change))
-
 
 change_plot %>%
   ggplot(aes(x = datetime, y = price_change)) +
@@ -250,7 +241,6 @@ change_plot %>%
 ```
 
 ## Assessment vs. Sale Price
-
 ```{r Assessment vs. Sale Price, fig.width = 8, fig.height = 5}
 
 listings %>%
@@ -269,7 +259,6 @@ listings %>%
 
 # Listing-Level Analysis
 ## Changes in Price
-
 These are the 20 most recently-listed addresses that have a change and have "Sold" somewhere in their recent history.
 ```{r Price Changes}
 listings_with_change <- listings %>%
@@ -320,9 +309,7 @@ listings %>%
 ```
 
 ## Changes in Status
-
 These are the 20 most recently-listed addresses that have a change. They don't necessarily have a "sold" entry in their history.
-
 ```{r Everything with Status Change, fig.width = 8, fig.height = 8}
 listings_with_change <- listings %>%
   filter(status != "Pending") %>%
@@ -361,17 +348,14 @@ listings %>%
 
 ```
 
-
-
 # Sale Price Model
-
 ```{r, Model setup, include=FALSE}
 source("pricing-model.R")
 rows_print <- 15
 ```
+
 ## Goodness of Fit
 The current 'complex model' is **`r paste(deparse(complex_form, width.cutoff = 500), collapse="")`**.
-
 ```{r, model figs, fig.width = 12, fig.height = 5}
 bind_cols(model = c("Dumb Model", "Complex Model"), 
           bind_rows(
@@ -394,8 +378,8 @@ broom::tidy(complex_model) %>%
   select(term, estimate, sig, p.value) 
 ```
 
-## Asking Too Much
-Top `r rows_print` overvalued properties with a list date in the last two weeks
+## Undervalued by Model
+Top `r rows_print` properties that are either undervalued by the model, or terrible deals.
 ```{r overvalued properties, rows.print = 10}
 
 print_listing_table <- function(df) {
@@ -405,13 +389,13 @@ print_listing_table <- function(df) {
            address_link = cell_spec(street,"html", link = url),
            value_score = round(xsv_z * 100),
            complex_prd = scales::dollar(complex_prd),
-           price =  scales::dollar(price),
-           loc_bin = case_when(
+            price =  scales::dollar(price),
+           loc_bin = str_trunc(case_when(
              postal_first %in% names(peninsula_codes) ~ peninsula_codes[postal_first],
              TRUE ~ city
-           )) %>%
+           ), 16)) %>%
     select(`Date` = scrape_date,
-           Address = address_link, 
+           Address = address_link,
            Location = loc_bin,
            `Pred. Sale Price` = complex_prd,
            `Listing Price` = price,
@@ -429,8 +413,8 @@ test_set %>%
   print_listing_table(.)
 ```
 
-## MAD DEALZ
-Top `r rows_print` undervalued properties with a list date in the last two weeks
+## Overvalued by Model
+Top `r rows_print` properties that are either overvalued by the model, or great deals!
 ```{r undervalued properties, rows.print = 10}
 
 test_set %>%
@@ -460,4 +444,3 @@ test_set %>%
   print_listing_table(.)
 
 ```
-
