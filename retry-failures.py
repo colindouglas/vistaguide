@@ -38,8 +38,18 @@ except FileNotFoundError:
 if len(urls) > 0:
     session.scrape_urls(urls)
     session.logger.info("Finished with yesterday's failures")
-    os.rename(failed_path, failed_path + ".done")
-    session.logger.info("Renaming: {0} >> {0}.done".format(failed_path))
+    # If the '.done'. file exists, append the URLS to the end
+    # Then
+    try:
+        with open(failed_path + ".done", 'a') as log:
+            for url in urls:
+                log.write(url)
+        os.remove(failed_path)
+        session.logger.info("Writing to {0}.done".format(failed_path))
+    # If the file doesn't
+    except FileNotFoundError:
+        os.rename(failed_path, failed_path + ".done")
+        session.logger.info("Renaming: {0} >> {0}.done".format(failed_path))
 
 
 # Close everything at the end

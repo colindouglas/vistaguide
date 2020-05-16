@@ -1,9 +1,9 @@
 library(tidyverse)
 library(lubridate)
+source("setup.R")
 
 # Convert the weird CSVs that aren't formated right to TSVs
 source("csv_to_tsv.R")
-source("setup.R")
 
 # For x = 'prefix: data' return 'data'
 drop_prefix <- function(x, prefix) {

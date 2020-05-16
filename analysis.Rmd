@@ -1,9 +1,12 @@
 ---
-title: "Halifax Listings"
-author: "Colin Douglas"
-date: "Created 6-Apr-2020"
+title: "Analysis of ViewPoint.ca Listings"
+# author: "Colin Douglas"
+date: Last Updated `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 always_allow_html: true
-output: md_document
+output: 
+  md_document:
+  html_document:
+    toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +20,6 @@ library(broom)
 source("setup.R")
 ```
 
-**Last Updated** `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 ```{r Read in data, define regions}
 
 listings_all <- read_csv("data/listings-clean.csv", col_types = cols())
@@ -28,11 +30,11 @@ listings <- listings_all %>%
   # Keep only the unique rows, because sometimes things get posted more than once
   distinct(mls_no, pid, price, status, .keep_all = TRUE) %>%
   mutate(status = factor(status, levels = names(status_colors)),
-         type = case_when(
+         type = factor(case_when(
            type == "Single Family" ~ "Single Family", 
            type %in% c("Duplex", "Triplex", "Fourplex") ~ "Multiplex",
            grepl("unit", type, ignore.case = TRUE) ~ "Multiplex",
-           TRUE ~ word(type, 1)),
+           TRUE ~ word(type, 1)), levels = type_order),
          street_address = address,
          address = ifelse(is.na(unit), address, paste0(unit, "-", address)))
 
@@ -63,7 +65,7 @@ listings %>%
   ggplot(aes(x = postal_city)) +
   geom_bar(aes(fill = type)) +
   facet_wrap(~ status, ncol = 1) +
-  scale_fill_brewer(name = "", palette = "Set1", direction = -1) +
+  scale_fill_discrete(name = "") +
   scale_x_discrete(name = "") +
   scale_y_continuous(name = "Listing Count") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
@@ -78,7 +80,7 @@ listings %>%
          status == "For Sale") %>%
   ggplot(aes(x = ymd(list_date))) +
   geom_bar(aes(fill = type), position = "stack", width = 0.9) +
-  scale_fill_brewer(name = "", palette = "Set1", direction = -1) +
+  scale_fill_discrete(name = "") +
   xlab("List Date") +
   scale_y_continuous(name = "Count")
 ```
@@ -361,7 +363,7 @@ bind_cols(model = c("Dumb Model", "Complex Model"),
           bind_rows(
   glance(dumb_model),
   glance(complex_model)
-))
+)) %>% as_tibble()
 
 model_figs
 ```
@@ -375,7 +377,7 @@ broom::tidy(complex_model) %>%
            str_replace(":sqft_dummy", " // sq.ft."),
          sig = symnum(p.value, corr = FALSE, na = FALSE, cutpoints = c(0, 
     0.001, 0.01, 0.05, 0.1, 1), symbols = c("***", "**", "*", ".", " "))) %>%
-  select(term, estimate, sig, p.value) 
+  select(term, estimate, sig, p.value)
 ```
 
 ## Undervalued by Model

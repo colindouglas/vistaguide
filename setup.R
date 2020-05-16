@@ -20,3 +20,6 @@ status_colors <- c("For Sale" = "#3288bd", # Blue
                    "Withdrawn" = "#9e0142", # Dark Red
                    "Defunct" = "#6a3d9a", # Purple
                    "Expired" = "darkgrey")
+
+type_order <- c("Single Family", "Condominium", "Mobile", "Land", "Multiplex",  
+                "Cottage", "Commercial", "Industrial", "Other")
