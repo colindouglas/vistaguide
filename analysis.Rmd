@@ -1,10 +1,15 @@
 ---
-title: "Analysis of ViewPoint.ca Listings"
+title: "ViewPoint.ca Listings"
 # author: "Colin Douglas"
 date: Last Updated `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 always_allow_html: true
+permalink: /real-estate/
+layout: page
+excerpt: Aggregated data on Nova Scotia real estate listings
+comments: false
 output: 
   md_document:
+    variant: markdown_phpextra
   html_document:
     toc: true
 ---
@@ -247,7 +252,7 @@ change_plot %>%
 
 listings %>%
   filter(status == "Sold",
-         assessment < 1E6,
+         assessment < 1E6, price < 2E6,
          assessment_year == "2020") %>%
   ggplot(aes(x = assessment, y = price)) +
   geom_point(aes(color = loc_bin), na.rm = TRUE) +
