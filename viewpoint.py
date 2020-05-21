@@ -43,10 +43,10 @@ class Viewpoint(webdriver.Firefox):
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 
-        # For console output, only print INFO and up
+        # For console output, only print WARNING and up
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
-        ch.setLevel(logging.INFO)
+        ch.setLevel(logging.WARNING)
         self.logger.addHandler(ch)
 
         self.logger.debug('Initializing Viewpointer session')
