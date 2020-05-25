@@ -3,19 +3,26 @@ library(lubridate)
 source("setup.R")
 
 # Convert the weird CSVs that aren't formated right to TSVs
-source("csv_to_tsv.R")
+source("csv-to-tsv.R")
 
-# For x = 'prefix: data' return 'data'
+files <- list.files(path = "data", pattern = "listings_[0-9]{9}.tsv", full.names = TRUE)
 
-
-# Turn each row into a a character vector, store in a list called rows
-rows <- map(1:nrow(raw_rows), ~ as.character(raw_rows[., ]))
-
-# Map over each list and apply to parse_row() function
-listings <- map_dfr(rows, ~ parse_row(.))
-
-
-listings_u <- listings %>%
+listings <- map_dfr(files, ~ read_tsv(., guess_max = 10000,
+                                     col_types = cols(
+                                       .default = col_character(),
+                                       datetime = col_datetime(),
+                                       price = col_double(),
+                                       list_date = col_date(),
+                                       days_on_market = col_integer(), 
+                                       assessment = col_double(),
+                                       assessment_year = col_integer(),
+                                       bedrooms = col_integer(),
+                                       bathrooms = col_integer(),
+                                       sqft_mla = col_double(),
+                                       sqft_tla = col_double(),
+                                       condo_fee = col_double(),
+                                       garage = col_logical()
+                                       ))) %>%
   # Split the postal code up for easier analysis
   separate(postal,
            into = c("postal_first", "postal_last"),
@@ -50,7 +57,7 @@ fsa_ns <- read_csv("data/ca-postal-codes.csv", col_types = cols()) %>%
 
 # Location binning -------------------------------------------------------
 
-listings_u <- listings_u %>%
+listings_u <- listings %>%
   left_join(fsa_ns, by = "postal_first") %>%
   mutate(peninsula = peninsula_codes[postal_first],
          loc_bin = factor(
