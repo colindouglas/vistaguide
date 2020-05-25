@@ -43,13 +43,6 @@ listings <- map_dfr(files, ~ read_tsv(., guess_max = 10000,
 
 
 # Postal Code Cleanup -----------------------------------------------------
-
-# # Read in list of postal codes
-# fsa_ns <- read_csv("data/canada_fsa.csv", col_types = cols())  %>%
-#   filter(`FSA-Province` == 12) %>% # NS
-#   select(postal = PostalCode, postal_city = `Place Name`, area_type = AreaType) %>%
-#   mutate(postal = paste(substring(postal, 1, 3), substring(postal, 4, 6)))
-
 # Read in list of postal codes
 fsa_ns <- read_csv("data/ca-postal-codes.csv", col_types = cols()) %>%
   filter(Province_abbr == "NS") %>%
