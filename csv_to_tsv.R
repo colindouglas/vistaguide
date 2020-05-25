@@ -24,13 +24,20 @@ for (file in files) {
 
   # Fix ALL of the delimeters that are followed by a capital letter
   x <-stri_replace_all(x,  regex = "(,)([A-Z,])", replacement = "\t$2")
-
+  
   # Only keep the rows where there's letters
   # Helps cleanup trailing garbage
   x <- x[grepl("[A-Za-z]", x)]
   
   # Write the cleanup to a TSV file
   message(filename, " >> ", file_out)
-  writeLines(x, con = file_out)
+  # writeLines(x, con = file_out)
+  
+  suppressWarnings(
+    tsv <- read_tsv(x, col_names = FALSE, col_types = cols(), guess_max = 10000) %>%
+      mutate(X1 = as.POSIXct(X1, optional = TRUE)) %>%
+      filter(!is.na(X1), !is.na(X2))
+  )
+  
 }
   
