@@ -7,7 +7,8 @@ source("csv-to-tsv.R")
 
 files <- list.files(path = "data", pattern = "listings_[0-9]{9}.tsv", full.names = TRUE)
 
-listings <- map_dfr(files, ~ read_tsv(., guess_max = 10000,
+listings_all <- suppressWarnings(
+  map_dfr(files, ~ read_tsv(., guess_max = 10000,
                                      col_types = cols(
                                        .default = col_character(),
                                        datetime = col_datetime(),
@@ -40,6 +41,7 @@ listings <- map_dfr(files, ~ read_tsv(., guess_max = 10000,
     ) %>%
   # Split the address into a street and a city
   separate(address, into = c("street", "city"), sep = ", ", remove = FALSE)
+)
 
 
 # Postal Code Cleanup -----------------------------------------------------
