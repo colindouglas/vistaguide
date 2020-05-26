@@ -263,10 +263,22 @@ class Viewpoint(webdriver.Firefox):
         while bool(next_button):
             # Find all the different properties on the index page by matching the text on their buttons
             listings = list()
+            retry = 0
             button_strings = ['Entered', 'day on market', 'days on market']  # Find buttons with this text
             self.explicitly_wait(3)  # Wait to prevent duplicates
             for button_string in button_strings:
                 listings = listings + self.find_elements_by_partial_link_text(button_string)
+
+            # If there's no buttons found, it's probably a bug, reload the page and try again, up to 5 times
+            while len(listings) == 0 and retry < 2:
+                retry += 1
+                self.logger.warning("No links found on page {p}".format(p=current_page))
+                self.explicitly_wait(60)
+                self.refresh()
+                self.logger.debug("Refreshed page (retry #{n})".format(n=retry))
+                for button_string in button_strings:
+                    listings = listings + self.find_elements_by_partial_link_text(button_string)
+
             self.logger.info('Found {n} links on page {p}'.format(n=len(listings),
                                                                   p=current_page
                                                                   ))
