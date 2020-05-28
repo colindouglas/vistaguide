@@ -8,10 +8,10 @@ layout: page
 excerpt: Aggregated data on Nova Scotia real estate listings
 comments: false
 output: 
-  md_document:
-    variant: markdown_phpextra
   html_document:
     toc: true
+  md_document:
+    variant: markdown_phpextra
 ---
 
 ```{r setup, include=FALSE}

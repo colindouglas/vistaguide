@@ -39,7 +39,7 @@ class Viewpoint(webdriver.Firefox):
         self.logger.setLevel(logging.DEBUG)
 
         # Rotate the log files at midnight, keep a week's worth of logging
-        fh = TimedRotatingFileHandler(filename=log, when='midnight', backupCount=7)
+        fh = TimedRotatingFileHandler(filename=log, when='midnight', backupCount=2)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 

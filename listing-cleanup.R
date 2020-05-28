@@ -52,7 +52,7 @@ fsa_ns <- read_csv("data/ca-postal-codes.csv", col_types = cols()) %>%
 
 # Location binning -------------------------------------------------------
 
-listings_u <- listings %>%
+listings_u <- listings_all %>%
   left_join(fsa_ns, by = "postal_first") %>%
   mutate(peninsula = peninsula_codes[postal_first],
          loc_bin = factor(
