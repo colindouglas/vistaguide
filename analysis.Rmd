@@ -1,5 +1,5 @@
 ---
-title: "Nova Scotia Real Estate Listings"
+title: "Nova Scotia Real Estate"
 # author: "Colin Douglas"
 date: Last Updated `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 always_allow_html: true
