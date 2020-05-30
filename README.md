@@ -3,7 +3,7 @@
 This is a collection of scripts to scrape and analyze Nova Scotia real estate listings
 
 * **/data/** contains the cleaned up listing data (in long form) as well as some postal code data
-*	**analysis.Rmd** is the Rmarkdown file that does most of the analysis work. The rendered report is as [colindougl.as/viewpointer/](https://colindougl.as/viewpointer/)
+*	**analysis.Rmd** is the Rmarkdown file that does most of the analysis work. The rendered report is as [colindougl.as/vp/](https://colindougl.as/vp/)
 * **csv_to_tsv.R** does some cleanup on malformed data that is sometimes served
 * **get-withinday-listings.py** is a script that downloads the results of a custom saved search
 *	**listing-cleanup.R** is a script to convert the scraped data to long format

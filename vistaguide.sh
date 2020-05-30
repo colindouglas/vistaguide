@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 today=$(date +''%Y%m%d'')
-wd=~/projects/viewpointer/  # Set the working directory
+wd=~/projects/vistaguide/  # Set the working directory
 
 cd ${wd} || exit
 
