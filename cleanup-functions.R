@@ -145,3 +145,74 @@ parse_row <- function(row) {
   }
   return(out)
 }
+
+get_latlong <- function(address, quiet = TRUE) {
+  
+  # If the address starts with a unit number, strip it
+  address <- str_replace(address, pattern = "^Unit [0-9]+ ", "")
+  
+  # If the address starts with "Lot", strip it
+  address <- str_replace(address, pattern = "^Lot ", "")
+  
+  # If the address ends wqith that stupid  "For sale" bullshit, get rid of it
+  address <- str_replace(address, pattern = ", Nova Scotia - For Sale \\$[0-9]+,[0-9]+", "")
+  
+  # Add "NS, Canada" to the end of every address if it's not already there
+  if (!grepl("NS, Canada", address)) {
+    address <- paste0(address, ", NS, Canada")
+  }
+  
+  Sys.sleep(1)
+  
+  tryCatch(
+    expr = {
+      geocode <- list(tmaptools::geocode_OSM(
+        paste0(address),
+        details = TRUE,
+        geometry = "point", 
+        return.first.only = TRUE))[[1]]
+      
+      out <- list(
+        "lat" = geocode$coords[["x"]],
+        "long" = geocode$coords[["y"]],
+        "osm_id" = geocode[["osm_id"]],
+        "place_id" = geocode[["place_id"]],
+        "osm_type" = geocode[["type"]],
+        "osm_importance" = geocode[["importance"]],
+        "osm_displayname" = geocode[["display_name"]])
+        
+        if (!quiet) {
+          message("Geocode successful: ", address)
+        }
+      },
+    warning = function(w) {
+      message("Warning @", address, " ", w)
+      
+      out <- list(
+        "lat" = NA_real_,
+        "long" = NA_real_,
+        "osm_id" = NA_integer_,
+        "place_id" = NA_integer_,
+        "osm_type" = NA_character_,
+        "osm_importance" = NA_real_,
+        "osm_displayname" = NA_character_
+      )
+      
+    },
+    error = function(e) {
+      
+      if (!quiet) {
+        message("Geocode failed: ", address)
+      }
+      
+      out <- list(
+        "lat" = NA_real_,
+        "long" = NA_real_,
+        "osm_id" = NA_integer_,
+        "place_id" = NA_integer_,
+        "osm_type" = NA_character_,
+        "osm_importance" = NA_real_,
+        "osm_displayname" = NA_character_
+      )})
+  return(out)
+}

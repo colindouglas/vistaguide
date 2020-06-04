@@ -36,6 +36,7 @@ for (file in files) {
   
   # Read the raw text as a tsv, clean up rows that aren't valid
   suppressWarnings(
+    # This is a read_tsv call, even though file is a .csv
     tsv <- read_tsv(x, col_names = FALSE, col_types = cols(), guess_max = 10000) %>%
     mutate(X1 = as.POSIXct(X1, optional = TRUE)) %>%
     filter(!is.na(X1), !is.na(X2))
@@ -47,7 +48,13 @@ for (file in files) {
   # Parse each row as a chr
   out <- map_dfr(rows, ~ parse_row(.))
   
-  # Write to .tsv
-  write_tsv(out, path = file_out)
-}
+  # Get lat/long from OSM
+  out_geo <- out %>%
+    rowwise() %>%
+    mutate(geocode = list(get_latlong(address, quiet = FALSE))) %>%
+    unnest_wider(geocode)
   
+  
+  # Write to .tsv
+  write_tsv(out_geo, path = file_out)
+}
