@@ -22,7 +22,12 @@ listings_all <- suppressWarnings(
                                        sqft_mla = col_double(),
                                        sqft_tla = col_double(),
                                        condo_fee = col_double(),
-                                       garage = col_logical()
+                                       garage = col_logical(),
+                                       lat = col_double(),
+                                       long = col_double(),
+                                       osm_id = col_integer(),
+                                       place_id = col_integer(),
+                                       osm_importance = col_double()
                                        ))) %>%
   # Split the postal code up for easier analysis
   separate(postal,
@@ -48,7 +53,7 @@ listings_all <- suppressWarnings(
 # Read in list of postal codes
 fsa_ns <- read_csv("data/ca-postal-codes.csv", col_types = cols()) %>%
   filter(Province_abbr == "NS") %>%
-  select(postal_first = Postal_Code, postal_city = `Place_Name`, long = Longitude, lat = Latitude)
+  select(postal_first = Postal_Code, postal_city = `Place_Name`)
 
 # Location binning -------------------------------------------------------
 

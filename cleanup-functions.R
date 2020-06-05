@@ -164,55 +164,44 @@ get_latlong <- function(address, quiet = TRUE) {
   
   Sys.sleep(1)
   
-  tryCatch(
-    expr = {
-      geocode <- list(tmaptools::geocode_OSM(
-        paste0(address),
-        details = TRUE,
-        geometry = "point", 
-        return.first.only = TRUE))[[1]]
-      
-      out <- list(
-        "lat" = geocode$coords[["x"]],
-        "long" = geocode$coords[["y"]],
-        "osm_id" = geocode[["osm_id"]],
-        "place_id" = geocode[["place_id"]],
-        "osm_type" = geocode[["type"]],
-        "osm_importance" = geocode[["importance"]],
-        "osm_displayname" = geocode[["display_name"]])
-        
-        if (!quiet) {
-          message("Geocode successful: ", address)
-        }
-      },
-    warning = function(w) {
-      message("Warning @", address, " ", w)
-      
-      out <- list(
-        "lat" = NA_real_,
-        "long" = NA_real_,
-        "osm_id" = NA_integer_,
-        "place_id" = NA_integer_,
-        "osm_type" = NA_character_,
-        "osm_importance" = NA_real_,
-        "osm_displayname" = NA_character_
-      )
-      
-    },
-    error = function(e) {
-      
-      if (!quiet) {
-        message("Geocode failed: ", address)
-      }
-      
-      out <- list(
-        "lat" = NA_real_,
-        "long" = NA_real_,
-        "osm_id" = NA_integer_,
-        "place_id" = NA_integer_,
-        "osm_type" = NA_character_,
-        "osm_importance" = NA_real_,
-        "osm_displayname" = NA_character_
-      )})
-  return(out)
+  out_on_fail <- list(
+    "lat" = NA_real_,
+    "long" = NA_real_,
+    "osm_id" = NA_real_,
+    "place_id" = NA_real_,
+    "osm_type" = NA_character_,
+    "osm_importance" = NA_real_,
+    "osm_displayname" = NA_character_
+    )
+  
+  out <- out_on_fail
+  
+  try({
+    geocode <- suppressWarnings(list(tmaptools::geocode_OSM(
+      address,
+      details = TRUE,
+      geometry = "point", 
+      return.first.only = TRUE))[[1]])
+    
+    out <- list(
+      "lat" = geocode$coords[["y"]],
+      "lon" = geocode$coords[["x"]],
+      "osm_id" = geocode[["osm_id"]],
+      "place_id" = geocode[["place_id"]],
+      "osm_type" = geocode[["type"]],
+      "osm_importance" = geocode[["importance"]],
+      "osm_displayname" = geocode[["display_name"]])
+    
+    if (!quiet) {
+      message("Geocoding: ", address)
+    }
+  })
+
+  if (is.null(out[["osm_displayname"]])) {
+    return(out_on_fail) 
+  } else if (!grepl("Canada", out[["osm_displayname"]])) {
+    return(out_on_fail)
+  } else {
+    return(out)
+  }
 }

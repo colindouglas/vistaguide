@@ -51,8 +51,9 @@ for (file in files) {
   # Get lat/long from OSM
   out_geo <- out %>%
     rowwise() %>%
-    mutate(geocode = list(get_latlong(address, quiet = FALSE))) %>%
-    unnest_wider(geocode)
+    mutate(geocode = list(get_latlong(address, quiet = FALSE)))  %>%
+    unnest_wider(geocode) %>%
+    map_dfc(unlist)
   
   
   # Write to .tsv
