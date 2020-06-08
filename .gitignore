@@ -10,5 +10,5 @@ config.txt
 *.html
 /analysis_files
 update-public.sh
-/figures/
+/img/
 analysis.md

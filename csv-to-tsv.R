@@ -51,7 +51,7 @@ for (file in files) {
   # Get lat/long from OSM
   out_geo <- out %>%
     rowwise() %>%
-    mutate(geocode = list(get_latlong(address, quiet = FALSE)))  %>%
+    mutate(geocode = list(get_latlong(address, quiet = TRUE)))  %>%
     unnest_wider(geocode) %>%
     map_dfc(unlist)
   

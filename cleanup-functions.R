@@ -177,11 +177,13 @@ get_latlong <- function(address, quiet = TRUE) {
   out <- out_on_fail
   
   try({
-    geocode <- suppressWarnings(list(tmaptools::geocode_OSM(
-      address,
-      details = TRUE,
-      geometry = "point", 
-      return.first.only = TRUE))[[1]])
+    geocode <- suppressWarnings(
+      list(tmaptools::geocode_OSM(
+        address,
+        details = TRUE,
+        geometry = "point", 
+        return.first.only = TRUE))[[1]]
+      )
     
     out <- list(
       "lat" = geocode$coords[["y"]],
@@ -196,7 +198,7 @@ get_latlong <- function(address, quiet = TRUE) {
       message("Geocoding: ", address)
     }
   })
-
+  
   if (is.null(out[["osm_displayname"]])) {
     return(out_on_fail) 
   } else if (!grepl("Canada", out[["osm_displayname"]])) {
