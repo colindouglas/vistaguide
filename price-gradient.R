@@ -2,6 +2,7 @@
 # a 2D price/sqft surface over it
 
 library(ggmap)
+library(tidyverse)
 register_google(key = filter(read_csv("../oauth_keys.csv", col_types = cols()), website == "gmaps")$key)
 
 center <- c(lat = 44.65, lon = -63.60)
@@ -55,12 +56,13 @@ prediction <- prediction %>%
   mutate(per_sqft = predict(fit, prediction),
          per_sqft = ifelse((per_sqft < 100 | per_sqft > 750), NA, per_sqft))
 
-
 hfx_heatmap <- halifax %>%
   ggmap() +
   geom_point(data = listings, aes(x = lon, y = lat), alpha = 0.2, na.rm = TRUE) +
-  geom_tile(data = prediction, aes(x = lon, y = lat, fill = per_sqft), alpha = 0.5, na.rm = TRUE) +
-  scale_fill_gradientn(colours = terrain.colors(10), trans = "log2", name = "$/Sq. Ft.") +
+  geom_contour_filled(data = prediction, 
+                      aes(x = lon, y = lat, z = per_sqft), 
+                      alpha = 0.5, na.rm = TRUE, binwidth = 50) +
+  labs(fill = "$/Sq. Ft") +
   theme(axis.title.x = element_blank(),
         axis.text.x  = element_blank(),
         axis.ticks.x = element_blank(),

@@ -17,6 +17,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(fig.path="img/")
+options(dplyr.summarise.inform = FALSE)
 
 library(tidyverse)
 library(lubridate)
@@ -231,6 +232,8 @@ listings %>%
 ```
 
 ## Peninsula Heatmap
+There is nothing surprising in this heatmap, but it's a nice visualization of what most people already know intuitively.
+
 ```{r peninsula heatmap, fig.width = 7.5, fig.height = 7}
 suppressWarnings(hfx_heatmap)
 ```
