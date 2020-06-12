@@ -6,7 +6,7 @@ output:
   html_document:
     toc: true
   md_document:
-    variant: markdown-tex_math_dollars
+    variant: markdown_mmd-tex_math_dollars
 ---
 
 ```{r setup, include=FALSE}
@@ -19,8 +19,8 @@ library(lubridate)
 library(kableExtra)
 library(broom)
 source("setup.R")
-source("price-gradient.R")
 
+# Take a datetime and return a readable string describing the approximate time
 bin_datetime <- function(datetime) {
   datetime <- as_datetime(datetime)
   breaks <- hour(hm("00:00", "6:00", "12:00", "18:00", "23:59"))
@@ -246,6 +246,7 @@ listings %>%
 There is nothing surprising in this heatmap, but it's a nice visualization of what most people already know intuitively.
 
 ```{r peninsula heatmap, fig.width = 7.5, fig.height = 7}
+source("price-gradient.R")
 suppressWarnings(hfx_heatmap)
 ```
 
@@ -300,18 +301,17 @@ listings %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), axis.ticks = element_blank())
 ```
 
-# Sale Price Model
+# Recent Properties for Sale
+These tables only list properties where their last event is being listed as "For Sale". They will disappear from this list once they've been listed as Pending or Sold.
+
 ```{r, Model setup, include=FALSE}
 source("pricing-model.R")
 rows_print <- 15
-```
-
-## Undervalued by Model
-Top `r rows_print` properties that are either undervalued by the model, or terrible deals.
-```{r overvalued properties, rows.print = 10}
 
 print_listing_table <- function(df) {
+  
   df %>%
+    distinct(pid, .keep_all = TRUE) %>%
     mutate(scrape_date = as_date(datetime),
       street = ifelse(is.na(unit), street, paste0(unit, "-", street)),
            address_link = cell_spec(street,"html", link = url),
@@ -327,13 +327,30 @@ print_listing_table <- function(df) {
            Location = loc_bin,
            `Pred. Sale Price` = complex_prd,
            `Listing Price` = price,
-           `Sq. Ft` = sqft_tla,
+           `Sq. Ft` = sqft_mla,
            `Value Score` = value_score) %>%
     kable("html", escape = FALSE) %>%
     kable_styling(bootstrap_options = c("hover", "condensed"))
   
 }
+```
 
+## Listings on the Peninsula
+
+The last 15 listings on the Halifax Peninsula by scrape date
+```{r Listings on the Peninsula}
+test_set %>%
+  arrange(desc(datetime)) %>%
+  filter(loc_bin == "Halifax Peninsula" | loc_bin %in% peninsula_codes) %>%
+  head(15) %>%
+  print_listing_table(.)
+
+```
+
+## Undervalued by Model
+Top `r rows_print` properties that are either undervalued by the model, or terrible deals.
+
+```{r Undervalued by Model}
 test_set %>%
   arrange(xsv_z) %>%
   filter(list_date > (today() - days(14))) %>%
@@ -353,22 +370,11 @@ test_set %>%
 ```
 
 ## Listings on Gladstone
-All of the listings on Gladstone St in Halifax
+The listings on Gladstone St. in Halifax that are still active.
 ```{r Listings at on Gladstone}
 test_set %>%
   arrange(desc(datetime)) %>%
   filter(grepl("Gladstone", address)) %>%
-  print_listing_table(.)
-
-```
-
-## Listings on the Peninsula
-The last 15 listings on the Halifax Peninsula by scrape date
-```{r Listings on the Peninsula}
-test_set %>%
-  arrange(desc(datetime)) %>%
-  filter(loc_bin == "Halifax Peninsula" | loc_bin %in% peninsula_codes) %>%
-  head(15) %>%
   print_listing_table(.)
 
 ```

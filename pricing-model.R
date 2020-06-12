@@ -31,6 +31,12 @@ listings <- read_csv("data/listings-clean.csv") %>%
   ungroup() %>%
   mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
 
+# Make a list of PIDs that are still for sale
+still_forsale <- listings %>%
+  arrange(datetime) %>%
+  group_by(pid) %>%
+  filter(tail(status, 1) == "For Sale") %>%
+  pull(pid) %>% unique()
 
 # Set up training and validation sets' ------------------------------------
 
@@ -40,8 +46,9 @@ if (train_on == "sold") {
     filter(status == "Sold")
   
   test_set <- listings %>%
-    filter(status == "For Sale") %>%
+    filter(status == "For Sale", pid %in% still_forsale) %>%
     distinct(mls_no, pid, .keep_all = TRUE)
+  
   # Train against everything, test against everything
 } else if (train_on == "everything") {
   test_set <- training_set <- listings
@@ -55,8 +62,7 @@ if (train_on == "sold") {
   test_set <- listings %>%
     filter(status %in% c("For Sale", "Sold")) %>%
     anti_join(training_set)
-  
-  
+
 } else {
   error("Don't know how to train like that!")
 }
