@@ -249,8 +249,12 @@ listings %>%
 There is nothing surprising in this heatmap, but it's a nice visualization of what most people already know intuitively.
 
 ```{r peninsula heatmap, fig.width = 7.5, fig.height = 7}
-source("price-gradient.R")
-suppressWarnings(hfx_heatmap)
+
+suppressMessages({
+  source("price-gradient.R")
+  hfx_heatmap
+})
+
 ```
 
 # Listing vs. Sale Price
