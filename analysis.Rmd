@@ -1,12 +1,14 @@
 ---
-title: "Nova Scotia Real Estate"
+title: "n.s. real estate"
 always_allow_html: true
 comments: false
+layout: page
+permalink: /real-estate/
 output: 
+  md_document:
+    variant: markdown-tex_math_dollars
   html_document:
     toc: true
-  md_document:
-    variant: markdown_mmd-tex_math_dollars
 ---
 
 ```{r setup, include=FALSE}
@@ -23,11 +25,12 @@ source("setup.R")
 # Take a datetime and return a readable string describing the approximate time
 bin_datetime <- function(datetime) {
   datetime <- as_datetime(datetime)
-  breaks <- hour(hm("00:00", "6:00", "12:00", "18:00", "23:59"))
+  breaks <- hour(hm("00:00", "6:00", "12:00", "16:00", "21:00", "23:59"))
   labels <- c("very early in the morning", 
               "in the morning", 
               "in the afternoon", 
-              "in the evening")
+              "in the evening",
+              "late in the evening")
   
   time_bin <- cut(hour(datetime), 
               breaks, labels, 
