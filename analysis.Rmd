@@ -292,6 +292,7 @@ pid_labeller <- pid_to_address$address
 names(pid_labeller) <- as.character(pid_to_address$pid)
 
 listings %>%
+  distinct(address, pid, status, price, .keep_all = TRUE) %>%
   filter(pid %in% tail(unique(listings_with_change), last_listings),
          price < 1E6) %>%
   arrange(list_date) %>%
