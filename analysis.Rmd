@@ -1,17 +1,12 @@
 ---
 title: "Nova Scotia Real Estate"
-# author: "Colin Douglas"
-date: Last Updated `r format(Sys.time(), "%b %d, %Y at %H:%M %p")`
 always_allow_html: true
-permalink: /real-estate/
-layout: page
-excerpt: Aggregated data on Nova Scotia real estate listings
 comments: false
 output: 
   html_document:
     toc: true
   md_document:
-    variant: markdown_phpextra
+    variant: markdown-tex_math_dollars
 ---
 
 ```{r setup, include=FALSE}
@@ -26,6 +21,22 @@ library(broom)
 source("setup.R")
 source("price-gradient.R")
 
+bin_datetime <- function(datetime) {
+  datetime <- as_datetime(datetime)
+  breaks <- hour(hm("00:00", "6:00", "12:00", "18:00", "23:59"))
+  labels <- c("very early in the morning", 
+              "in the morning", 
+              "in the afternoon", 
+              "in the evening")
+  
+  time_bin <- cut(hour(datetime), 
+              breaks, labels, 
+              include.lowest=TRUE)
+  
+  date <- format(as_date(datetime), format = "%A %B %d, %Y")
+  
+  paste(time_bin, "on", date)
+}
 ```
 
 ```{r Read in data, define regions}
@@ -50,9 +61,9 @@ last_dt <- as_datetime(max(listings$datetime, na.rm = TRUE))
 
 ```
 # Summary
-These are aggregate statistics on real estate listings in Nova Scotia. Each evening, I scrape real estate listings from *the popular real estate sites* and compile them into one big data set. I first started collecting data on April 6, 2020.
+These are aggregate statistics on real estate listings in Nova Scotia. Twice a day, I scrape real estate listings from *the internet* and compile them into one big data set. I first started collecting data on April 6, 2020.
 
-This dataset contains **`r nrow(listings_all)` data points** on **`r listings$mls_no %>% unique() %>% length()` unique listings**. The last update was performed on **`r format(last_dt, "%A %B %d, %Y at %I:%M %p")`**, and scraped **`r nrow(filter(listings, datetime > Sys.Date() - hours(18)))`** different listing pages.
+This dataset contains **`r nrow(listings_all)` rows** describing **`r listings$mls_no %>% unique() %>% length()` unique listings**. The last update was performed **`r bin_datetime(last_dt)`**, and scraped **`r nrow(filter(listings, datetime > Sys.Date() - hours(18)))`** different listing pages.
 
 # Volume
 
