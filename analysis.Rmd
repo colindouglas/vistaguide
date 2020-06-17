@@ -5,10 +5,10 @@ comments: false
 layout: page
 permalink: /real-estate/
 output: 
-  md_document:
-    variant: markdown-tex_math_dollars
   html_document:
     toc: true
+  md_document:
+    variant: markdown-tex_math_dollars
 ---
 
 ```{r setup, include=FALSE}
@@ -20,6 +20,7 @@ library(tidyverse)
 library(lubridate)
 library(kableExtra)
 library(broom)
+library(tsibble)
 source("setup.R")
 
 # Take a datetime and return a readable string describing the approximate time
@@ -71,6 +72,8 @@ This dataset contains **`r nrow(listings_all)` rows** describing **`r listings$m
 # Volume
 
 This figure shows the net change in inventory in a given day. It is calculated as new listings with a status of "For Sale" minus the sum of new listings with the statuses "Sold", "Expired", "Withdrawn", and "Cancelled". Listings with a status of "Pending" are ignored. The dashed line denotes the 7 day rolling mean of market entrances per day.
+
+## Last Month
 ```{r Balance in Listings, fig.width = 10, fig.height = 4}
 listing_type <- c("For Sale" = "enter", 
                   "Sold" = "exit", 
@@ -89,7 +92,7 @@ volume_changes <- listings %>%
   pivot_wider(id_cols = date, names_from = "status_type", values_from = "N", values_fill = list(N = 0)) %>%
   mutate(net_change = enter - exit)
   
-volume_plot <- listings %>%
+volume_plot_daily <- listings %>%
   filter(status != "Pending") %>%
   group_by(date = as_date(datetime), status) %>%
   summarize(count = n()) %>%
@@ -106,9 +109,55 @@ volume_plot <- listings %>%
   geom_text(data = volume_changes, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes, aes(y = zoo::rollmean(net_change, 7, na.pad=TRUE, align = "right")), lty = 2, na.rm = TRUE) +
   labs(x = "Date", y = "Change in Active Listings") +
-  scale_x_date(limits = c(Sys.Date() - days(45), Sys.Date() + days(1)))
+  scale_x_date(limits = c(Sys.Date() - days(31), Sys.Date() + days(1)))
 
-suppressWarnings(print(volume_plot))
+suppressWarnings(print(volume_plot_daily))
+
+```
+
+## Weekly
+```{r Balance Trend Overall, fig.width = 10, fig.height = 4}
+
+listings_ts <- as_tsibble(listings, key = mls_no, index = datetime)
+
+volume_changes_weekly <- listings_ts %>%
+  mutate(status = as.character(status), 
+         status_type = listing_type[status]) %>%
+  filter(status != "Pending", !is.na(status_type)) %>%
+  group_by(status_type) %>% 
+  index_by(year_week = ~ yearweek(.)) %>%
+  summarize(N = n()) %>%
+  pivot_wider(id_cols = year_week, names_from = "status_type", values_from = "N", values_fill = list(N = 0)) %>%
+  mutate(
+    net_change = case_when(
+      year_week == yearweek(today()) ~ NA_integer_,  #  Don't calc for the current week so no trendline
+      TRUE ~ enter - exit),
+    year_week = as_date(year_week))
+  
+volume_plot_daily <- listings_ts %>%
+  mutate(status = as.character(status), 
+         status_type = listing_type[status]) %>%
+  filter(status != "Pending", !is.na(status_type)) %>%
+  group_by(status) %>%
+  index_by(year_week = ~ yearweek(.)) %>%
+  summarize(count = n()) %>%
+  mutate(status = as.character(status),
+    status_type = listing_type[status],
+         count = case_when(
+           status_type == "enter" ~ count,
+           status_type == "exit" ~ -count
+         )) %>%
+  mutate(year_week = as_date(year_week)) %>%
+  ggplot(aes(x = year_week, y = count)) +
+  geom_col(aes(fill = status), na.rm = TRUE) +
+  scale_fill_manual(values = status_colors, guide = FALSE) +
+  geom_text(data = volume_changes_weekly, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
+  geom_text(data = volume_changes_weekly, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
+  geom_line(data = volume_changes_weekly, aes(y = net_change, group = 1), lty = 2, na.rm = TRUE) +
+  scale_x_date(name = "List Date", date_labels = "%-m/%-d", date_breaks = "1 week") +
+  labs(y = "Change in Active Listings")
+
+suppressWarnings(print(volume_plot_daily))
 
 ```
 
@@ -153,7 +202,7 @@ hrm_vs_other %>%
 ## Price Trends
 Trends in the price per unit area of different property types in different location binds. No line is drawn until there are at least 20 data points in a facet, but still be cautious of overfitting.
 
-```{r Price per Square Foot Over Time, fig.width = 10, fig.height = 4}
+```{r Price per Square Foot Over Time, fig.width = 10, fig.height = 6}
 
 sqft_vs_time <- listings %>%    
   filter(status %in% c("For Sale", "Sold"),
@@ -169,12 +218,12 @@ svt_fit <- sqft_vs_time %>%
 
 
 sqft_plot <- svt_fit  %>% 
-  ggplot(aes(x = datetime, y = price/sqft_mla)) +
-  geom_point(aes(color = type), alpha = 0.2) +
-  facet_grid(status ~ loc_bin, scales = "free_y") +
-  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = type), level = 0.01, lwd = 0.7, span = 1) +
-  labs(x = "List Date") +
-  scale_color_brewer(name = "", palette = "Set1", direction = -1) +
+  ggplot(aes(x = as_date(datetime), y = price/sqft_mla)) +
+  geom_point(aes(color = status), alpha = 0.1) +
+  facet_grid(type ~ loc_bin, scales = "free") +
+  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = status), level = 0.01, lwd = 0.7, span = 1) +
+scale_x_date(name = "List Date", date_labels = "%-m/%-d") +
+  scale_color_manual(values = status_colors, name = "") +
   scale_y_continuous(name = "$/Sq. Ft.") +
   coord_cartesian(ylim = c(75, 550)) +
   theme(legend.position = "bottom")
@@ -274,7 +323,7 @@ close_order <- listings %>%
   group_by(pid, address) %>%
   summarize(list_date = max(datetime)) %>%
   arrange(list_date) %>%
-  pull(address) %>%
+  pull(pid) %>%
   unique()
 
 col_num <- 4
@@ -292,6 +341,7 @@ pid_labeller <- pid_to_address$address
 names(pid_labeller) <- as.character(pid_to_address$pid)
 
 listings %>%
+  mutate(pid = factor(pid, levels = close_order)) %>%
   distinct(address, pid, status, price, .keep_all = TRUE) %>%
   filter(pid %in% tail(unique(listings_with_change), last_listings),
          price < 1E6) %>%
@@ -302,7 +352,7 @@ listings %>%
   geom_blank(aes(y = price * 1.05)) +  geom_blank(aes(y = price * 0.95)) + # Add a least a bit of scale to the price changes
   geom_point(aes(color = status), size = 4) +
   scale_color_manual(values = status_colors, name = "") +
-  scale_x_date(name = "List Date") +
+  scale_x_date(name = "List Date", date_minor_breaks = "1 day", date_breaks = "7 days", date_labels = "%-m/%-d") +
   facet_wrap(~ pid, scales = "free_y", ncol = col_num, labeller = labeller(pid = pid_labeller)) +
   ggrepel::geom_text_repel(aes(label = paste0("$", round(price/1000), "k"))) + 
   scale_y_continuous(name = "Price", breaks = seq(0, 1E6, by = 10000), labels = c()) +

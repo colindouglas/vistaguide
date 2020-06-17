@@ -67,7 +67,7 @@ if (train_on == "sold") {
   error("Don't know how to train like that!")
 }
 
-complex_form <- price ~ loc_bin*(sqft_dummy + days_on_market) + style_bin + building_age  + assessment_in_thousands + is_nice
+complex_form <- price ~ loc_bin*(sqft_dummy + days_on_market) + style_bin + assessment_in_thousands
 
 complex_model <- training_set %>%
   lm(complex_form, data = .)
