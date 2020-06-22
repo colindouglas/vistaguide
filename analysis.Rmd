@@ -154,7 +154,7 @@ volume_plot_daily <- listings_ts %>%
   geom_text(data = volume_changes_weekly, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
   geom_text(data = volume_changes_weekly, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes_weekly, aes(y = net_change, group = 1), lty = 2, na.rm = TRUE) +
-  scale_x_date(name = "List Date", date_labels = "%-m/%-d", date_breaks = "1 week") +
+  scale_x_date(name = "Week (Starting On)", date_labels = "%-m/%-d", date_breaks = "1 week") +
   labs(y = "Change in Active Listings")
 
 suppressWarnings(print(volume_plot_daily))
@@ -202,10 +202,11 @@ hrm_vs_other %>%
 ## Price Trends
 Trends in the price per unit area of different property types in different location binds. No line is drawn until there are at least 20 data points in a facet, but still be cautious of overfitting.
 
-```{r Price per Square Foot Over Time, fig.width = 10, fig.height = 6}
+```{r Price per Square Foot Over Time, fig.width = 8, fig.height = 7}
 
 sqft_vs_time <- listings %>%    
   filter(status %in% c("For Sale", "Sold"),
+         type %in% c("Single Family", "Condominium"),
          loc_bin != "Rest of Province",
          between(sqft_mla, 450, 4000),
          !is.na(type))
@@ -220,13 +221,12 @@ svt_fit <- sqft_vs_time %>%
 sqft_plot <- svt_fit  %>% 
   ggplot(aes(x = as_date(datetime), y = price/sqft_mla)) +
   geom_point(aes(color = status), alpha = 0.1) +
-  facet_grid(type ~ loc_bin, scales = "free") +
+  facet_grid(loc_bin ~ type, scales = "free") +
   geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = status), level = 0.01, lwd = 0.7, span = 1) +
 scale_x_date(name = "List Date", date_labels = "%-m/%-d") +
   scale_color_manual(values = status_colors, name = "") +
   scale_y_continuous(name = "$/Sq. Ft.") +
-  coord_cartesian(ylim = c(75, 550)) +
-  theme(legend.position = "bottom")
+  coord_cartesian(ylim = c(75, 550))
 
 suppressWarnings(print(sqft_plot))
 

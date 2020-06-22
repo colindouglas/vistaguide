@@ -3,7 +3,7 @@
 
 library(ggmap)
 library(tidyverse)
-register_google(key = filter(read_csv("../oauth_keys.csv", col_types = cols()), website == "gmaps")$key)
+register_google(key = filter(read_csv("../secrets.csv", col_types = cols()), website == "gmaps")$key)
 
 center <- c(lat = 44.65, lon = -63.60)
 widths <- c(lat = 0.2, lon = -0.2)
