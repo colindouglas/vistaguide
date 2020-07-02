@@ -47,7 +47,7 @@ class Viewpoint(webdriver.Chrome):
         # For console output, only print WARNING and up
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
-        ch.setLevel(logging.DEBUG) # Warning
+        ch.setLevel(logging.WARNING)
         self.logger.addHandler(ch)
 
         self.logger.debug('Initializing Viewpointer session')
@@ -58,9 +58,9 @@ class Viewpoint(webdriver.Chrome):
         profile = webdriver.FirefoxProfile()
         profile.set_preference("print.always_print_silent", True)
         profile.set_preference("print.show_print_progress", False)
-        self.logger.debug('Starting up Firefox')
+        self.logger.debug('Starting up Dr')
 
-        # Run Firefox headless so it can hide in the background and not steal focus
+        # Run browser headless so it can hide in the background and not steal focus
         gecko_options = ff_Options()
         chrome_options = ch_Options()
         if headless:
@@ -86,7 +86,7 @@ class Viewpoint(webdriver.Chrome):
         self.logger.info("Recording failures to " + self.fail_path)
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
-        # Init the webdriver with the options and Firefox profile defined above
+        # Init the webdriver with the options defined above
         super().__init__("chromedriver", options=chrome_options)
 
         self.failed = list()  # URLs that have failed
@@ -96,7 +96,7 @@ class Viewpoint(webdriver.Chrome):
         # Set the window larger so everything stays on screen
         self.set_window_position(0, 0)
         self.set_window_size(1920, 1080)
-        self.logger.debug('Changed Firefox window size')
+        self.logger.debug('Changed window size')
         self.implicitly_wait(5)
 
         # Open the login URL and log in
@@ -438,14 +438,14 @@ class Viewpoint(webdriver.Chrome):
 
     # Closes every window except the index window (with the handle self.index_window)
     def close_leftover_windows(self):
-        self.logger.debug('Open windows: ' + str(self.window_handles))
+        self.logger.debug('Open windows before cleanup: {}'.format(len(self.window_handles)))
         self.logger.debug('Closing leftover windows...')
         for window in self.window_handles:
             if window != self.index_window:
                 self.switch_to.window(window)
                 self.close()
         self.switch_to.window(self.index_window)
-        self.logger.debug('Open windows: ' + str(self.window_handles))
+        self.logger.debug('Open windows after cleanup: {}'.format(len(self.window_handles)))
 
 
 
