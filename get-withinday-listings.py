@@ -25,6 +25,7 @@ session = vp.Viewpoint(
 
 # Open the Dashboard for a text list
 session.logger.debug('Opening the dashboard')
+session.explicitly_wait(2)
 session.find_element_by_link_text('DASHBOARD').click()
 session.explicitly_wait(5)
 

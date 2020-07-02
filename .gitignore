@@ -12,3 +12,4 @@ config.txt
 update-public.sh
 /img/
 analysis.md
+chromedriver

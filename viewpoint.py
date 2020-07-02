@@ -3,7 +3,8 @@ from selenium.common import exceptions as sce
 from datetime import datetime
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.options import Options as ff_Options
+from selenium.webdriver.chrome.options import Options as ch_Options
 from bs4 import BeautifulSoup
 import re
 import time
@@ -23,7 +24,7 @@ def next_filename(base: chr = 'listing_') -> chr:
     return path
 
 
-class Viewpoint(webdriver.Firefox):
+class Viewpoint(webdriver.Chrome):
     # Function to start the web scraper and login with a username and password
     # Returns the Selenium driver object, which gets passed to subsequent functions
     def __init__(self, username, password, headless=True,
@@ -46,7 +47,7 @@ class Viewpoint(webdriver.Firefox):
         # For console output, only print WARNING and up
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
-        ch.setLevel(logging.WARNING)
+        ch.setLevel(logging.DEBUG) # Warning
         self.logger.addHandler(ch)
 
         self.logger.debug('Initializing Viewpointer session')
@@ -60,9 +61,14 @@ class Viewpoint(webdriver.Firefox):
         self.logger.debug('Starting up Firefox')
 
         # Run Firefox headless so it can hide in the background and not steal focus
-        options = Options()
+        gecko_options = ff_Options()
+        chrome_options = ch_Options()
         if headless:
-            options.headless = True
+            gecko_options.headless = True
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-gpu")
             self.logger.debug('Running headless')
         else:
             self.logger.debug('Not running headless')
@@ -81,9 +87,7 @@ class Viewpoint(webdriver.Firefox):
 
         _LOGIN_URL = 'https://www.viewpoint.ca/user/login#!/new-today-list/'
         # Init the webdriver with the options and Firefox profile defined above
-        super().__init__(profile,
-                         options=options,
-                         log_path='logs/geckodriver.log')
+        super().__init__("chromedriver", options=chrome_options)
 
         self.failed = list()  # URLs that have failed
         self.worked = list()  # URLs that have worked
