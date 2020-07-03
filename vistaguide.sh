@@ -18,7 +18,7 @@ echo Logging to ${logfile}
 cd ${wd} || exit
 
 # Scrape today's data from ViewPoint
-venv/bin/python3 -u 01-scrape-new-today.py
+#venv/bin/python3 -u 01-scrape-new-today.py
 
 # Retry yesterday's failures
 venv/bin/python3 -u 02-retry-failures.py 
@@ -33,5 +33,5 @@ Rscript --no-save --no-restore --verbose 04-tidy-and-combine.R
 Rscript --no-save --no-restore --verbose 05-render-markdown.R
 
 # Deploy to web
-cd ~/projects/colindougl.as || exit
-./_update.sh 
+./06-deploy.sh 
+
