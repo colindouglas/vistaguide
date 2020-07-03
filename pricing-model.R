@@ -1,6 +1,6 @@
 library(tidyverse)
 library(patchwork)
-source("setup.R")
+source("setup-constants.R")
 # source("sentiment-analysis.R") # For using prices predicted by the sentiment of the description. Not useful
 
 

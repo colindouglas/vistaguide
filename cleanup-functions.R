@@ -23,6 +23,16 @@ extract_number <- function(x) {
     as.numeric()
 }
 
+quiet_geocode_OSM <- function(...) {
+  # Shut up shut up shut up!
+  nothing <- capture.output(
+    suppressWarnings(
+      suppressMessages(
+      out <- tmaptools::geocode_OSM(...)
+    )))
+  return(out)
+}
+
 
 # Function to parse the not-necessarily-ordered fields in a row
 parse_row <- function(row) {
@@ -149,13 +159,14 @@ parse_row <- function(row) {
 get_latlong <- function(address, quiet = TRUE) {
   
   # If the address starts with a unit number, strip it
-  address <- str_replace(address, pattern = "^Unit [0-9]+ ", "")
+  address <- str_remove_all(address, pattern = "^Unit [0-9]+ ")
+  address <- str_remove_all(address, pattern = "^[0-9]+-")
   
   # If the address starts with "Lot", strip it
-  address <- str_replace(address, pattern = "^Lot ", "")
+  address <- str_remove_all(address, pattern = "^Lot ")
   
   # If the address ends with that stupid  "For sale" bullshit, get rid of it
-  address <- str_replace(address, pattern = ", Nova Scotia - For Sale \\$[0-9]+,[0-9]+", "")
+  address <- str_remove_all(address, pattern = ", Nova Scotia - For Sale \\$[0-9]+,[0-9]+")
   
   # Remove characters that will mess up the response
   address <- str_remove_all(address, pattern = "[\\/><]")
@@ -169,7 +180,7 @@ get_latlong <- function(address, quiet = TRUE) {
   
   out_on_fail <- list(
     "lat" = NA_real_,
-    "long" = NA_real_,
+    "lon" = NA_real_,
     "osm_id" = NA_real_,
     "place_id" = NA_real_,
     "osm_type" = NA_character_,
@@ -178,15 +189,16 @@ get_latlong <- function(address, quiet = TRUE) {
     )
   
   out <- out_on_fail
-  
   try({
-    geocode <- suppressWarnings(
-      list(tmaptools::geocode_OSM(
-        address,
+    geocode <- list(
+      #tmaptools::geocode_OSM(
+      quiet_geocode_OSM( 
+       address,
         details = TRUE,
         geometry = "point", 
-        return.first.only = TRUE))[[1]]
-      )
+        return.first.only = TRUE)
+    )[[1]]
+      
     
     out <- list(
       "lat" = geocode$coords[["y"]],
@@ -197,16 +209,29 @@ get_latlong <- function(address, quiet = TRUE) {
       "osm_importance" = geocode[["importance"]],
       "osm_displayname" = geocode[["display_name"]])
     
-    if (!quiet) {
-      message("Geocoding: ", address)
-    }
+
   })
   
-  if (is.null(out[["osm_displayname"]])) {
+  if (is.null(out[["osm_id"]])) {
+    if (!quiet) message("Geocoding failed: ", address)
     return(out_on_fail) 
   } else if (!grepl("Canada", out[["osm_displayname"]])) {
+    if (!quiet) message("Geocoding failed: ", address)
     return(out_on_fail)
   } else {
+    if (!quiet) message("Geocoding succeeded: ", address)
     return(out)
   }
+}
+
+
+best_value <- function(x) {
+  
+  # If there's only NAs, return NA
+  if (all(is.na(x))) return(NA_character_)
+  
+  # Remove all of the NAs
+  x <- x[!is.na(x)]
+  
+  names(sort(table(x), decreasing = TRUE))[[1]]
 }
