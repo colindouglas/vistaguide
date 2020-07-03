@@ -154,8 +154,11 @@ get_latlong <- function(address, quiet = TRUE) {
   # If the address starts with "Lot", strip it
   address <- str_replace(address, pattern = "^Lot ", "")
   
-  # If the address ends wqith that stupid  "For sale" bullshit, get rid of it
+  # If the address ends with that stupid  "For sale" bullshit, get rid of it
   address <- str_replace(address, pattern = ", Nova Scotia - For Sale \\$[0-9]+,[0-9]+", "")
+  
+  # Remove characters that will mess up the response
+  address <- str_remove_all(address, pattern = "[\\/><]")
   
   # Add "NS, Canada" to the end of every address if it's not already there
   if (!grepl("NS, Canada", address)) {

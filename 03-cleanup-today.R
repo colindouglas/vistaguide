@@ -57,31 +57,47 @@ for (file in files) {
   # Parse each row as a chr
   out <- map_dfr(rows, ~ parse_row(.))
   
-  # Get lat/long from previous lookups
+  # Get lat/long of previous lookups to avoid unnecessary API calls to OSM
   geocode_lookup <- read_csv("data/geocode_lookup.csv", col_types = cols())
   out_geo <- left_join(out, geocode_lookup, by = "address")
   
-  # If required, try to find the missing geocoding data from OSM
-  if (GEOCODE_MISSING) {
-     geo_missing <- out_geo %>%
-       filter(is.na(osm_id)) %>%
-       select(address) %>%
-       rowwise() %>%
-       mutate(geocode = list(get_latlong(address, quiet = TRUE)))  %>%
-       unnest_wider(geocode) %>%
-       map_dfc(unlist) %>%
-       mutate_at(vars(-osm_type, -address, -osm_displayname), as.numeric)
-              
-     
-     out_geo <- left_join(out_geo, geo_missing, by = "address")
-     
-     geocode_lookup <- bind_rows(geocode_lookup, geo_missing) %>%
-       distinct(address, lat, lon, osm_id, place_id, osm_type, osm_importance, osm_displayname) %>%
-       filter(!is.na(osm_id))
-     
-     write_csv(geocode_lookup, path = "data/geocode_lookup.csv")
-     
-  }
+  # Get a df of all of the rows where the geocode data is missing
+  geo_missing <- filter(out_geo, is.na(osm_id))
+  
+  # If we want to lookup missing geocode information
+  if (GEOCODE_MISSING & nrow(geo_missing) > 0) {
+    
+    # The rows where we were _successful_ in looking up prior geocode data
+    geo_cached <- filter(out_geo, !is.na(osm_id))
+    
+    # Do geocode lookup on the addresses where we don't have geocode data
+    geo_missing_lookups <- geo_missing %>%
+      select(address) %>%
+      rowwise() %>%
+      mutate(geocode = list(get_latlong(address, quiet = FALSE)))  %>%
+      unnest_wider(geocode) %>%
+      map_dfc(unlist) %>%
+      mutate_at(vars(-osm_type, -address, -osm_displayname), as.numeric)
+    
+    # Update the geocode lookup cache
+    
+    # Find the rows where we didn't have cached data but 
+    # we were successful in looking it up from the API
+    geo_newlookups <- geo_missing %>%
+      filter(!is.na(osm_id)) %>%
+      select(names(geocode_lookup))
+
+    # Add the new successful lookups to the old cache, then keep only the distinct rows
+    geocode_lookup <- bind_rows(geocode_lookup, geo_newlookups) %>%
+      distinct(osm_id, .keep_all = TRUE) # Porbably not necessary
+    
+    # Perform the lookup with the new geocode cache
+    out_geo <- left_join(out, geocode_lookup, by = "address")
+    
+    # Write the cached lookups for future use
+    write_csv(geocode_lookup, path = "data/geocode_lookup.csv")
+
+  } 
   
   # Write to .tsv
   write_tsv(out_geo, path = file_out)
