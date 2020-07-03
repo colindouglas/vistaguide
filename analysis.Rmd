@@ -67,7 +67,7 @@ last_dt <- as_datetime(max(listings$datetime, na.rm = TRUE))
 # Summary
 These are aggregate statistics on real estate listings in Nova Scotia. Twice a day, I scrape real estate listings from *the internet* and compile them into one big data set. I first started collecting data on April 6, 2020.
 
-This dataset contains **`r nrow(listings_all)` rows** describing **`r listings$mls_no %>% unique() %>% length()` unique listings**. The last update was performed **`r bin_datetime(last_dt)`**, and scraped **`r nrow(filter(listings, datetime > Sys.Date() - hours(18)))`** different listing pages.
+This dataset contains **`r nrow(listings_all)` rows** describing **`r listings_all$mls_no %>% unique() %>% length()` unique listings**. The last update was performed **`r bin_datetime(last_dt)`**, and scraped **`r nrow(filter(listings_all, datetime > Sys.Date() - hours(24)))`** different listing pages.
 
 # Volume
 

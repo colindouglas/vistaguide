@@ -2,9 +2,6 @@ library(tidyverse)
 library(lubridate)
 source("setup.R")
 
-# Convert the weird CSVs that aren't formated right to TSVs
-source("csv-to-tsv.R")
-
 files <- list.files(path = "data", pattern = "listings_[0-9]{9}.tsv", full.names = TRUE)
 
 listings_all <- suppressWarnings(

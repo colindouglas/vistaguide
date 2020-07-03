@@ -1,9 +1,13 @@
 library(stringi)
 library(tidyverse)
+library(lubridate)
 source("cleanup-functions.R")
 
 # Should we overwrite TSVs that already exist?
 OVERWRITE <- FALSE
+
+# Should we make OSM geocoding lookups for the properties that don't have data?
+GEOCODE_MISSING <- TRUE
 
 # Get a list of all of the CSV files
 files <- list.files('data', pattern = "(listings)_[0-9]{9}\\.csv", full.names = TRUE)
@@ -16,7 +20,10 @@ for (file in files) {
     next()
   }
   
-  x <- readLines(file) 
+  x <- readLines(file)
+  
+  # Remove all of the dumb quotes the dumb real estate agents use for emphasis
+  x <- gsub('"', "", x, fixed = TRUE)
 
   # Fix the delimiter between time and address
   x <- stri_replace_all(x, regex = "([0-9]{2}\\.[0-9]{6})(,)", replacement = "$1\t")
@@ -48,13 +55,29 @@ for (file in files) {
   # Parse each row as a chr
   out <- map_dfr(rows, ~ parse_row(.))
   
-  # Get lat/long from OSM
-  out_geo <- out %>%
-    rowwise() %>%
-    mutate(geocode = list(get_latlong(address, quiet = TRUE)))  %>%
-    unnest_wider(geocode) %>%
-    map_dfc(unlist)
+  # Get lat/long from previous lookups
+  geocode_lookup <- read_csv("data/geocode_lookup.csv", col_types = cols())
+  out_geo <- left_join(out, geocode_lookup, by = "address")
   
+  # If required, try to find the missing geocoding data from OSM
+  if (GEOCODE_MISSING) {
+     geo_missing <- out_geo %>%
+       filter(is.na(osm_id)) %>%
+       select(address) %>%
+       rowwise() %>%
+       mutate(geocode = list(get_latlong(address, quiet = TRUE)))  %>%
+       unnest_wider(geocode) %>%
+       map_dfc(unlist)
+     
+     out_geo <- left_join(out_geo, geo_missing, by = "address")
+     
+     geocode_lookup <- bind_rows(geocode_lookup, geo_missing) %>%
+       distinct(address, lat, lon, osm_id, place_id, osm_type, osm_importance, osm_displayname) %>%
+       filter(!is.na(osm_id))
+     
+     write_csv(geocode_lookup, path = "data/geocode_lookup.csv")
+     
+  }
   
   # Write to .tsv
   write_tsv(out_geo, path = file_out)
