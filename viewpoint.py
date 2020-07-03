@@ -315,7 +315,7 @@ class Viewpoint(webdriver.Chrome):
                 self.implicitly_wait(2)
 
             # Switch back to the index window
-            self.switch_to.window(index_window)
+            # self.switch_to.window(index_window)
 
             # Check if there's a next button, and click on it if it exists
             next_button = self.next_button()
@@ -438,6 +438,8 @@ class Viewpoint(webdriver.Chrome):
 
     # Closes every window except the index window (with the handle self.index_window)
     def close_leftover_windows(self):
+        if len(self.window_handles) == 1:
+            return
         self.logger.debug('Open windows before cleanup: {}'.format(len(self.window_handles)))
         self.logger.debug('Closing leftover windows...')
         for window in self.window_handles:

@@ -9,7 +9,6 @@ config.txt
 /logs/
 *.html
 /analysis_files
-update-public.sh
 /img/
 analysis.md
-chromedriver
+06-deploy.sh

@@ -1,7 +1,9 @@
-library(stringi)
-library(tidyverse)
-library(lubridate)
-source("cleanup-functions.R")
+suppressPackageStartupMessages({
+  library(stringi)
+  library(tidyverse)
+  library(lubridate)
+  source("cleanup-functions.R")
+})
 
 # Should we overwrite TSVs that already exist?
 OVERWRITE <- FALSE
@@ -67,7 +69,9 @@ for (file in files) {
        rowwise() %>%
        mutate(geocode = list(get_latlong(address, quiet = TRUE)))  %>%
        unnest_wider(geocode) %>%
-       map_dfc(unlist)
+       map_dfc(unlist) %>%
+       mutate_at(vars(-osm_type, -address, -osm_displayname), as.numeric)
+              
      
      out_geo <- left_join(out_geo, geo_missing, by = "address")
      

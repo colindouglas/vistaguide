@@ -33,5 +33,5 @@ Rscript --no-save --no-restore --verbose 04-tidy-and-combine.R
 Rscript --no-save --no-restore --verbose 05-render-markdown.R
 
 # Deploy to web
-cd ~/projects/colindougl.as || exit
-./_update.sh 
+./06-deploy.sh 
+
