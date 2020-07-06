@@ -37,7 +37,7 @@ bin_datetime <- function(datetime) {
               breaks, labels, 
               include.lowest=TRUE)
   
-  date <- format(as_date(datetime), format = "%A %B %d, %Y")
+  date <- format(as_date(datetime), format = "%A %B %-d, %Y")
   
   paste(time_bin, "on", date)
 }
@@ -158,6 +158,34 @@ volume_plot_daily <- listings_ts %>%
   labs(y = "Change in Active Listings")
 
 suppressWarnings(print(volume_plot_daily))
+
+```
+
+# Time on Market
+Time between list date and the first time the listing shows up as "Sold". Showing HRM listings only
+```{r Time on Market, fig.width = 10, fig.height = 4}
+
+listings_ts %>%
+  filter(status == "Sold", 
+         loc_bin != "Rest of Province", 
+         datetime > ymd("2020-04-06"), 
+         between(price, 1e5, 1e6)) %>%
+  index_by(date_group = ~ yearweek(.)) %>%
+  mutate(days_to_sale = as.numeric(as_date(datetime) - list_date)) %>% 
+  select(date_group, days_to_sale, price) %>%
+  ggplot(aes(x = as_date(date_group), y = days_to_sale)) +
+  ggbeeswarm::geom_quasirandom(alpha = 0.4, aes(color = price)) +
+  geom_boxplot(aes(group = date_group), outlier.shape = NA, alpha = 0) +
+  coord_cartesian(ylim = c(1, 200)) +
+  scale_x_date(name = "Week (Starting On)", date_labels = "%-m/%-d", date_breaks = "1 week") +
+  scale_y_continuous(name = "Days to Sale") +
+  scale_color_viridis_c(name = "Sale Price",
+                        option = "A", 
+                        trans = "log", 
+                        direction = -1,
+                        breaks = c(100000, 250000, 500000), 
+                        labels = function(x) { paste0(scales::dollar(round(x/1000)), "k") })
+  
 
 ```
 

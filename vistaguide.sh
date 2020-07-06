@@ -1,8 +1,5 @@
 #!/usr/bin/bash
 
-# Set appropriate paths
-source /home/colin/.bashrc
-
 today=$(date +''%Y%m%d'')
 wd=/home/colin/projects/vistaguide  # Set the working directory
 logfile=${wd}/logs/console/"${today}".log
@@ -33,5 +30,5 @@ Rscript --no-save --no-restore --verbose 04-tidy-and-combine.R
 Rscript --no-save --no-restore --verbose 05-render-markdown.R
 
 # Deploy to web
-./06-deploy.sh 
+source 06-deploy.sh 
 
