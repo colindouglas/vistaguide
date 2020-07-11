@@ -43,3 +43,4 @@ session.scrape_index()
 
 # Close everything at the end
 session.quit()
+session.logger.debug('Scrape complete')

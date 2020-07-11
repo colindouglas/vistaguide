@@ -12,3 +12,4 @@ config.txt
 /img/
 analysis.md
 06-deploy.sh
+listings.db

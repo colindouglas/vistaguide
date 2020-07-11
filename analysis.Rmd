@@ -21,7 +21,8 @@ library(lubridate)
 library(kableExtra)
 library(broom)
 library(tsibble)
-source("setup.R")
+source("setup-constants.R")
+source("connect-db.R")
 
 # Take a datetime and return a readable string describing the approximate time
 bin_datetime <- function(datetime) {
@@ -34,8 +35,8 @@ bin_datetime <- function(datetime) {
               "late in the evening")
   
   time_bin <- cut(hour(datetime), 
-              breaks, labels, 
-              include.lowest=TRUE)
+                  breaks, labels, 
+                  include.lowest=TRUE)
   
   date <- format(as_date(datetime), format = "%A %B %-d, %Y")
   
@@ -43,31 +44,45 @@ bin_datetime <- function(datetime) {
 }
 ```
 
-```{r Read in data, define regions}
+```{r Read in data from db, calculate summary stats for header}
 
-listings_all <- read_csv("data/listings-clean.csv", col_types = cols())
+properties <- tbl(dbcon, "properties")
+updates <- tbl(dbcon, "updates") 
+geocode <- tbl(dbcon, "geocode")
+
+listings_all <- updates %>%
+  left_join(properties, by = "prop_id") %>%
+  left_join(geocode, by = "address")
 
 listings <- listings_all %>%
   filter(!is.na(type), !is.na(status)) %>%
   arrange(datetime) %>%
-  # Keep only the unique rows, because sometimes things get posted more than once
-  distinct(mls_no, pid, price, status, .keep_all = TRUE) %>%
-  mutate(status = factor(status, levels = names(status_colors)),
-         type = factor(case_when(
-           type == "Single Family" ~ "Single Family", 
-           type %in% c("Duplex", "Triplex", "Fourplex") ~ "Multiplex",
-           grepl("unit", type, ignore.case = TRUE) ~ "Multiplex",
-           TRUE ~ word(type, 1)), levels = type_order),
+  collect() %>%
+  mutate(datetime = ymd_hms(datetime),
          street_address = address,
          address = ifelse(is.na(unit), address, paste0(unit, "-", address)))
 
-last_dt <- as_datetime(max(listings$datetime, na.rm = TRUE))
+unique_updates <- updates %>% 
+  summarize(n = n()) %>% 
+  collect() %>%
+  pull()
+
+unique_properties <- properties %>% 
+  summarize(n = n()) %>% 
+  collect() %>%
+  pull()
+
+last_update <- max(listings$datetime)
+
+new_today <- listings %>%
+  filter(datetime > Sys.Date() - hours(24)) %>%
+  nrow()
 
 ```
 # Summary
 These are aggregate statistics on real estate listings in Nova Scotia. Twice a day, I scrape real estate listings from *the internet* and compile them into one big data set. I first started collecting data on April 6, 2020.
 
-This dataset contains **`r nrow(listings_all)` rows** describing **`r listings_all$mls_no %>% unique() %>% length()` unique listings**. The last update was performed **`r bin_datetime(last_dt)`**, and scraped **`r nrow(filter(listings_all, datetime > Sys.Date() - hours(24)))`** different listing pages.
+This dataset contains **`r unique_updates` rows** describing **`r unique_properties` unique listings**. The last update was performed **`r bin_datetime(last_update)`**, and discovered **`r new_today`** new listings.
 
 # Volume
 
@@ -269,6 +284,7 @@ suppressWarnings(print(sqft_plot))
 
 ```{r price changes over time, fig.width = 8, fig.height = 4}
 change_plot <- listings %>%
+  filter(loc_bin != "Rest of Province") %>%
   group_by(pid) %>%
   filter(n() > 1) %>%
   arrange(datetime) %>%
@@ -299,7 +315,7 @@ change_plot %>%
   ggrepel::geom_label_repel(data = change_labels, x = now(), 
                             aes(y = mean_change, color = status, label = scales::percent(mean_change, accuracy = 0.01)), 
                             hjust = 0, direction = 'y') +
-  coord_cartesian(ylim = c(-.1, .1))
+  coord_cartesian(ylim = c(-.01, .01))
 
 ```
 
