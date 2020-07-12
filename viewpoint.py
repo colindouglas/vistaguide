@@ -17,11 +17,13 @@ from numpy.random import normal as rand_norm
 # e.g., listing-202004051.csv for the second output of April 5, 2020
 def next_filename(base: chr = 'listing_') -> chr:
     i = 0
-    path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
-    while os.path.exists(path):
+    path_csv = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
+    path_done = '{base}{dt}{i}.done'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i) 
+    while os.path.exists(path_csv) or os.path.exists(path_done):
         i += 1
-        path = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
-    return path
+        path_csv = '{base}{dt}{i}.csv'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
+        path_done = '{base}{dt}{i}.done'.format(base=base, dt=datetime.now().strftime('%Y%m%d'), i=i)
+    return path_csv
 
 
 class Viewpoint(webdriver.Chrome):

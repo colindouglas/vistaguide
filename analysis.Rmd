@@ -50,17 +50,21 @@ properties <- tbl(dbcon, "properties")
 updates <- tbl(dbcon, "updates") 
 geocode <- tbl(dbcon, "geocode")
 
-listings_all <- updates %>%
+updates_all <- updates %>%
   left_join(properties, by = "prop_id") %>%
   left_join(geocode, by = "address")
 
-listings <- listings_all %>%
+listings_all <- updates_all %>%
   filter(!is.na(type), !is.na(status)) %>%
   arrange(datetime) %>%
   collect() %>%
   mutate(datetime = ymd_hms(datetime),
+         list_date = as_date(list_date),
          street_address = address,
          address = ifelse(is.na(unit), address, paste0(unit, "-", address)))
+
+listings <- listings_all %>%
+  distinct(prop_id, status, price, .keep_all = TRUE)
 
 unique_updates <- updates %>% 
   summarize(n = n()) %>% 
@@ -315,7 +319,7 @@ change_plot %>%
   ggrepel::geom_label_repel(data = change_labels, x = now(), 
                             aes(y = mean_change, color = status, label = scales::percent(mean_change, accuracy = 0.01)), 
                             hjust = 0, direction = 'y') +
-  coord_cartesian(ylim = c(-.01, .01))
+  coord_cartesian(ylim = c(-.05, .05))
 
 ```
 

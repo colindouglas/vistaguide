@@ -6,7 +6,8 @@ suppressPackageStartupMessages({
 # Remove duplicate entries in some tables
 # Duplicates in 'properties' ----------------------------------------------
 properties <- collect(tbl(dbcon, "properties"))
-properties_clean <- distinct(properties, prop_id, .keep_all = TRUE)
+properties_clean <- distinct(properties, prop_id, .keep_all = TRUE) %>%
+  filter(!is.na(prop_id))
 
 if (nrow(properties) != nrow(properties_clean)) {
   message("properties: ", nrow(properties),  " >> ", nrow(properties_clean))
@@ -20,7 +21,8 @@ if (nrow(properties) != nrow(properties_clean)) {
 
 # Duplicates in 'geocode' -------------------------------------------------
 geocode <- collect(tbl(dbcon, "geocode"))
-geocode_clean <- distinct(geocode, address, .keep_all = TRUE)
+geocode_clean <- distinct(geocode, address, .keep_all = TRUE) %>% 
+  filter(!is.na(address))
 
 if (nrow(geocode) != nrow(geocode_clean)) {
   message("geocode: ", nrow(geocode),  " >> ", nrow(geocode_clean))
@@ -34,7 +36,8 @@ if (nrow(geocode) != nrow(geocode_clean)) {
 
 # Duplicates in 'updates' -------------------------------------------------
 updates <- collect(tbl(dbcon, "updates"))
-updates_clean <- distinct(updates, update_id, .keep_all = TRUE)
+updates_clean <- distinct(updates, update_id, .keep_all = TRUE) %>%
+  filter(!is.na(update_id))
 
 
 if (nrow(updates) != nrow(updates_clean)) {

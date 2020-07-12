@@ -54,36 +54,41 @@ for (file in files) {
   # Convert each row to chr
   rows <- map(1:nrow(tsv), ~ as.character(tsv[., ]))
   
+  integer_cols <- c("update_id", "prop_id", "price", "days_on_market", 
+                    "mls_no", "pid", "assessment", "assessment_year",
+                    "bedrooms", "bathrooms", "sqft_mla", "sqft_tla",
+                    "building_age")
   # Parse each row as a chr
-  out <- map_dfr(rows, ~ parse_row(.))
+  out <- map_dfr(rows, ~ parse_row(.)) %>%
+    mutate_at(vars(any_of(integer_cols)), ~ as.numeric(.))
   
   # Add prop_ids to new properties ------------------------------------------
   
   # Get the identifiers of the properties that are already in the DB
   properties_lookup <- tbl(dbcon, "properties") %>%
     select(prop_id, mls_no, address) %>%
+    distinct() %>%
     collect()
   
-  # Join property IDs for properties that are already in the DB
-  properties_existing <- left_join(out, properties_lookup, by = c("mls_no", "address"))
-  
   # Find the last property ID used in the database
-  last_prop_id <- max(as.numeric(properties_existing$prop_id), na.rm = TRUE)
+  last_prop_id <- max(as.numeric(properties_lookup$prop_id), na.rm = TRUE)
   
   # Find the properties that aren't in the DB yet
-  properties_new <- filter(properties_existing, is.na(prop_id))
-  
   # Assign the new properties new property ID keys
-  properties_new <- properties_new %>%
+  properties_new <- anti_join(out, properties_lookup, by = c("address", "mls_no")) %>%
     group_by(address, mls_no) %>%
-    mutate(prop_id = cur_group_id() + last_prop_id)
-  
+    mutate(prop_id = cur_group_id() + last_prop_id) %>%
+    distinct(prop_id, .keep_all = TRUE)
+
   # Reassemble the known and new properties with IDs
+  properties_existing <- anti_join(out, properties_new, by = c("address", "mls_no")) %>%
+    left_join(properties_lookup, by = c("address", "mls_no"))
+  
   out <- bind_rows(properties_existing, properties_new)
   
   # Small misc. data cleanups -----------------------------------------------
   out <- out %>%
-    filter(!is.na(address)) %>%
+    filter(!is.na(address), !is.na(datetime)) %>%
     # Split the postal code into a "field" field and a "last" field
     separate(postal, into = c("postal_first", "postal_last"), sep = " |\\-", remove = FALSE) %>%
     mutate(
@@ -102,13 +107,13 @@ for (file in files) {
       url = str_remove_all(url, pattern = "&print=1"),
       
       # Calculate a unique ID for each row
-      update_id = paste0(as.integer(as.POSIXct(datetime)), substring(mls_no, 5, 9)),
+      update_id = as.numeric(paste0(as.numeric(as.POSIXct(datetime)), substring(mls_no, 5, 9))),
       source_file = file,
     ) %>%
     
     # Split the address into a street and a city
     separate(address, into = c("street", "city"), sep = ", ", remove = FALSE, extra = "merge") 
-  
+
   # Bin the locations -------------------------------------------------------
   
   ns_postals <- tbl(dbcon, "postals") %>%

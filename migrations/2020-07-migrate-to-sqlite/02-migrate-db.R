@@ -56,7 +56,7 @@ dbWriteTable(dbcon, "postals", canada_fsa, overwrite = OVERWRITE)
 # Drop the columns that might vary within the same listing
 properties <- listings_clean %>%
   select(-price, -days_on_market, -status,  # Properties of the 'scrape', separate table
-         -lat, -lon, -starts_with("osm")) # Properties of 'geocode', separate table
+         -lat, -lon, -starts_with("osm"), -place_id) # Properties of 'geocode', separate table
 
 # For columns that _should_ be the same, but aren't, delegate the collapse to the best_value()
 # function that lives in cleanup-functions.R
@@ -114,7 +114,6 @@ dbWriteTable(dbcon, "properties", properties, overwrite = TRUE,
                              rental_equipment = "character", 
                              exterior = "character", 
                              compliments_of = "character", 
-                             place_id = "integer", 
                              style = "character", 
                              school_elem = "character", 
                              school_jrhigh = "character", 
@@ -142,14 +141,14 @@ dbWriteTable(dbcon, "geocode", geocode, overwrite = TRUE)
 
 
 updates <- listings_clean %>%
-  mutate(update_id = paste0(as.integer(as.POSIXct(datetime)), substring(mls_no, 5, 9))) %>%
-  select(update_id, prop_id, datetime, status, price, days_on_market) %>%
+  mutate(update_id = paste0(as.numeric(as.POSIXct(datetime)), substring(mls_no, 5, 9))) %>%
+  select(update_id, prop_id, datetime, status, price, days_on_market, source_file) %>%
   distinct(update_id, .keep_all = TRUE)
 
 dbWriteTable(dbcon, "updates", updates, overwrite = TRUE,
-             field.types = c("datetime" = "text",
+             field.types = c(datetime = "text",
                              update_id = "integer", 
                              prop_id = "integer", 
                              status = "character", 
                              price = "integer", 
-                             days_on_market = "integer")))
+                             days_on_market = "integer"))

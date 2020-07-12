@@ -21,10 +21,9 @@ venv/bin/python3 -u 01-scrape-new-today.py
 venv/bin/python3 -u 02-retry-failures.py 
 
 # Cleanup today's newly scraped data
-Rscript --no-save --no-restore --verbose 03-cleanup-today.R
+Rscript --no-save --no-restore --verbose 03-cleanup-scraped.R
 
-# Cleanup the listing data
-Rscript --no-save --no-restore --verbose 04-tidy-and-combine.R 
+# No need to run 04, it's run from 03
 
 # Render the markdown file
 Rscript --no-save --no-restore --verbose 05-render-markdown.R
