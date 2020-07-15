@@ -176,7 +176,10 @@ class Viewpoint(webdriver.Chrome):
             return False
         finally:
             self.logger.debug('Closing pretty window {0}: {1}'.format(self.current_window_handle, self.current_url))
-            self.close()
+            try:
+                self.close()
+            except sce.NoSuchWindowException:
+                pass
             self.explicitly_wait(2)
 
         # Switch context to the printable page

@@ -8,7 +8,7 @@ mlaw <- 0.5  # Weighting for MLA sqft number
 train_on <- "sold" # One of "sold", "everything", or a fraction < 1.0
 
 
-listings <- read_csv("data/listings-clean.csv") %>%
+listings_model <- listings %>%
   distinct(pid, status, price, .keep_all = TRUE) %>%
   filter(price < 1000000, sqft_mla > 400,
          type %in% c("Single Family", "Condominium"),
@@ -32,7 +32,7 @@ listings <- read_csv("data/listings-clean.csv") %>%
   mutate(building_age = ifelse(is.na(building_age), mean(building_age, na.rm = TRUE), building_age))
 
 # Make a list of PIDs that are still for sale
-still_forsale <- listings %>%
+still_forsale <- listings_model %>%
   arrange(datetime) %>%
   group_by(pid) %>%
   filter(tail(status, 1) == "For Sale") %>%
@@ -42,24 +42,24 @@ still_forsale <- listings %>%
 
 # Train on "Sold" listings, test against "for sale" listings
 if (train_on == "sold") {
-  training_set <- listings %>%
+  training_set <- listings_model %>%
     filter(status == "Sold")
   
-  test_set <- listings %>%
+  test_set <- listings_model %>%
     filter(status == "For Sale", pid %in% still_forsale) %>%
     distinct(mls_no, pid, .keep_all = TRUE)
   
   # Train against everything, test against everything
 } else if (train_on == "everything") {
-  test_set <- training_set <- listings
+  test_set <- training_set <- listings_model
   
   # Train on some fraction, then test on the remaining
 } else if (is.numeric(train_on) & between(train_on, 0.5, 1)) {
-  training_set <- listings %>%
+  training_set <- listings_model %>%
     filter(status %in% c("For Sale", "Sold")) %>%
     sample_frac(size = train_on)
   
-  test_set <- listings %>%
+  test_set <- listings_model %>%
     filter(status %in% c("For Sale", "Sold")) %>%
     anti_join(training_set)
 

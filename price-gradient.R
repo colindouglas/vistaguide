@@ -19,7 +19,7 @@ lat_stop <- max(lat_ends)
 zoom_level <- 13
 raster_width <- 0.002
 
-listings <- read_csv("data/listings-clean.csv", col_types = cols()) %>%
+listings_grad <- read_csv("data/listings-clean.csv", col_types = cols()) %>%
   mutate(per_sqft = price/sqft_tla) %>%
   filter(between(lon, lon_start, lon_stop),
          between(lat, lat_start, lat_stop),
@@ -27,7 +27,7 @@ listings <- read_csv("data/listings-clean.csv", col_types = cols()) %>%
 
 halifax <- get_googlemap(center = paste(center, collapse = ", "), zoom = zoom_level)
 
-fit <- listings %>%
+fit <- listings_grad %>%
   filter(!is.na(per_sqft)) %>%
   loess(per_sqft ~ lon + lat, data = ., span = 0.1)
 
@@ -58,7 +58,7 @@ prediction <- prediction %>%
 
 hfx_heatmap <- halifax %>%
   ggmap() +
-  geom_point(data = listings, aes(x = lon, y = lat), alpha = 0.2, na.rm = TRUE) +
+  geom_point(data = listings_grad, aes(x = lon, y = lat), alpha = 0.2, na.rm = TRUE) +
   geom_contour_filled(data = prediction, 
                       aes(x = lon, y = lat, z = per_sqft), 
                       alpha = 0.5, na.rm = TRUE, binwidth = 50) +

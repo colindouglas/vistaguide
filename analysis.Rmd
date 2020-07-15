@@ -1,5 +1,5 @@
 ---
-title: "n.s. real estate"
+title: "Halifax Real Estate"
 always_allow_html: true
 comments: false
 layout: page
@@ -25,8 +25,7 @@ source("setup-constants.R")
 source("connect-db.R")
 
 # Take a datetime and return a readable string describing the approximate time
-bin_datetime <- function(datetime) {
-  datetime <- as_datetime(datetime)
+bin_datetime <- function(x) {
   breaks <- hour(hm("00:00", "6:00", "12:00", "16:00", "21:00", "23:59"))
   labels <- c("very early in the morning", 
               "in the morning", 
@@ -34,11 +33,11 @@ bin_datetime <- function(datetime) {
               "in the evening",
               "late in the evening")
   
-  time_bin <- cut(hour(datetime), 
+  time_bin <- cut(hour(x), 
                   breaks, labels, 
                   include.lowest=TRUE)
   
-  date <- format(as_date(datetime), format = "%A %B %-d, %Y")
+  date <- format(as_date(x), format = "%A %B %-d, %Y")
   
   paste(time_bin, "on", date)
 }
@@ -52,7 +51,8 @@ geocode <- tbl(dbcon, "geocode")
 
 updates_all <- updates %>%
   left_join(properties, by = "prop_id") %>%
-  left_join(geocode, by = "address")
+  left_join(geocode, by = "address") %>%
+  filter(loc_bin != "Rest of Province")
 
 listings_all <- updates_all %>%
   filter(!is.na(type), !is.na(status)) %>%
@@ -76,7 +76,6 @@ unique_properties <- properties %>%
   collect() %>%
   pull()
 
-last_update <- max(listings$datetime)
 
 new_today <- listings %>%
   filter(datetime > Sys.Date() - hours(24)) %>%
@@ -84,9 +83,9 @@ new_today <- listings %>%
 
 ```
 # Summary
-These are aggregate statistics on real estate listings in Nova Scotia. Twice a day, I scrape real estate listings from *the internet* and compile them into one big data set. I first started collecting data on April 6, 2020.
+These are aggregate statistics on real estate listings in Halifax and surrounding areas. Twice a day, I scrape real estate listings from *the internet* and compile them into one big data set. I first started collecting data on April 6, 2020.
 
-This dataset contains **`r unique_updates` rows** describing **`r unique_properties` unique listings**. The last update was performed **`r bin_datetime(last_update)`**, and discovered **`r new_today`** new listings.
+This dataset contains **`r unique_updates` rows** describing **`r unique_properties` unique listings**. The last update was performed **`r bin_datetime(Sys.time())`**, and updated **`r new_today`** listings.
 
 # Volume
 
@@ -123,7 +122,7 @@ volume_plot_daily <- listings %>%
          )) %>%
   ggplot(aes(x = date, y = count)) +
   geom_col(aes(fill = status), na.rm = TRUE) +
-  scale_fill_manual(values = status_colors, guide = FALSE) +
+  scale_fill_manual(values = status_colors, name = "") +
   geom_text(data = volume_changes, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
   geom_text(data = volume_changes, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes, aes(y = zoo::rollmean(net_change, 7, na.pad=TRUE, align = "right")), lty = 2, na.rm = TRUE) +
@@ -169,7 +168,7 @@ volume_plot_daily <- listings_ts %>%
   mutate(year_week = as_date(year_week)) %>%
   ggplot(aes(x = year_week, y = count)) +
   geom_col(aes(fill = status), na.rm = TRUE) +
-  scale_fill_manual(values = status_colors, guide = FALSE) +
+  scale_fill_manual(values = status_colors, name = "") +
   geom_text(data = volume_changes_weekly, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
   geom_text(data = volume_changes_weekly, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes_weekly, aes(y = net_change, group = 1), lty = 2, na.rm = TRUE) +
@@ -181,7 +180,7 @@ suppressWarnings(print(volume_plot_daily))
 ```
 
 # Time on Market
-Time between list date and the first time the listing shows up as "Sold". Showing HRM listings only
+Time between list date and the first time the listing shows up as "Sold". 
 ```{r Time on Market, fig.width = 10, fig.height = 4}
 
 listings_ts %>%
