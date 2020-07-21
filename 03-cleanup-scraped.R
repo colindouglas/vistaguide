@@ -43,6 +43,10 @@ for (file in files) {
   # Only keep the rows where there's letters, helps filter out garbage
   x <- paste(x[grepl("[A-Za-z]", x)], "\n")
   
+  # Rearrange x so the longest row is first
+  # This helps with some parsing errors
+  x <- x[rev(order(nchar(x), x))]
+  
   # Read the raw text as a tsv, clean up rows that aren't valid
   suppressWarnings(
     # This is a read_tsv call, even though file is a .csv
@@ -58,9 +62,10 @@ for (file in files) {
                     "mls_no", "pid", "assessment", "assessment_year",
                     "bedrooms", "bathrooms", "sqft_mla", "sqft_tla",
                     "building_age")
+  
   # Parse each row as a chr
   out <- map_dfr(rows, ~ parse_row(.)) %>%
-    mutate_at(vars(any_of(integer_cols)), ~ as.numeric(.))
+    mutate_at(vars(any_of(integer_cols)), ~ as.numeric(.)) 
   
   # Add prop_ids to new properties ------------------------------------------
   
