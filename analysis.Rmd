@@ -136,7 +136,9 @@ suppressWarnings(print(volume_plot_daily))
 ## Weekly
 ```{r Balance Trend Overall, fig.width = 10, fig.height = 4}
 
-listings_ts <- as_tsibble(listings, key = mls_no, index = datetime)
+listings_ts <- listings %>%
+  distinct(datetime, mls_no, .keep_all = TRUE) %>%
+  as_tsibble(key = mls_no, index = datetime)
 
 volume_changes_weekly <- listings_ts %>%
   mutate(status = as.character(status), 
@@ -189,14 +191,14 @@ listings_ts %>%
          datetime > ymd("2020-04-06"), 
          between(price, 1e5, 1e6)) %>%
   index_by(date_group = ~ yearweek(.)) %>%
-  mutate(days_to_sale = as.numeric(as_date(datetime) - list_date)) %>% 
+  mutate(days_to_sale = as.numeric(as_date(datetime) - list_date),
+         days_to_sale = ifelse(days_to_sale < 1, 1, days_to_sale)) %>%
   select(date_group, days_to_sale, price) %>%
   ggplot(aes(x = as_date(date_group), y = days_to_sale)) +
   ggbeeswarm::geom_quasirandom(alpha = 0.4, aes(color = price)) +
   geom_boxplot(aes(group = date_group), outlier.shape = NA, alpha = 0) +
-  coord_cartesian(ylim = c(1, 200)) +
   scale_x_date(name = "Week (Starting On)", date_labels = "%-m/%-d", date_breaks = "1 week") +
-  scale_y_continuous(name = "Days to Sale") +
+  scale_y_log10(name = "Days to Sale", minor_breaks = c(1:10, (1:10)*10, (1:10)*100)) +
   scale_color_viridis_c(name = "Sale Price",
                         option = "A", 
                         trans = "log", 
