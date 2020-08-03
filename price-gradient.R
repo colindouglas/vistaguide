@@ -3,6 +3,7 @@
 
 library(ggmap)
 library(tidyverse)
+source("connect-db.R")
 register_google(key = filter(read_csv("../secrets.csv", col_types = cols()), website == "gmaps")$key)
 
 center <- c(lat = 44.65, lon = -63.60)
@@ -19,7 +20,21 @@ lat_stop <- max(lat_ends)
 zoom_level <- 13
 raster_width <- 0.002
 
-listings_grad <- read_csv("data/listings-clean.csv", col_types = cols()) %>%
+
+properties <- tbl(dbcon, "properties")
+updates <- tbl(dbcon, "updates") 
+geocode <- tbl(dbcon, "geocode")
+
+updates_all <- updates %>%
+  left_join(properties, by = "prop_id") %>%
+  left_join(geocode, by = "address") %>%
+  filter(loc_bin != "Rest of Province", 
+         !is.na(osm_id),
+         !is.na(price),
+         !is.na(sqft_tla)) %>%
+  collect()
+
+listings_grad <- updates_all %>%
   mutate(per_sqft = price/sqft_tla) %>%
   filter(between(lon, lon_start, lon_stop),
          between(lat, lat_start, lat_stop),
