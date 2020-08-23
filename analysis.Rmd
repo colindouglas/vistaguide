@@ -12,8 +12,14 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_chunk$set(fig.path="img/")
+knitr::opts_chunk$set(
+    base.url = "/",
+    echo = FALSE,
+    fig.path="img/",
+    cache.path = 'img/',
+    screenshot.force = FALSE
+  )
+
 options(dplyr.summarise.inform = FALSE)
 
 library(tidyverse)
@@ -23,6 +29,7 @@ library(broom)
 library(tsibble)
 source("setup-constants.R")
 source("connect-db.R")
+library(plotly)
 
 # Take a datetime and return a readable string describing the approximate time
 bin_datetime <- function(x) {
@@ -179,6 +186,8 @@ volume_plot_daily <- listings_ts %>%
 
 suppressWarnings(print(volume_plot_daily))
 
+#ggplotly(volume_plot_daily)
+
 ```
 
 # Time on Market
@@ -256,7 +265,7 @@ sqft_vs_time <- listings %>%
   filter(status %in% c("For Sale", "Sold"),
          type %in% c("Single Family", "Condominium"),
          loc_bin != "Rest of Province",
-         between(sqft_mla, 450, 4000),
+         between(price/sqft_mla, 1, 1000),
          !is.na(type))
 
 svt_fit <- sqft_vs_time %>%
@@ -268,13 +277,12 @@ svt_fit <- sqft_vs_time %>%
 
 sqft_plot <- svt_fit  %>% 
   ggplot(aes(x = as_date(datetime), y = price/sqft_mla)) +
-  geom_point(aes(color = status), alpha = 0.1) +
+  geom_rug(aes(color = status, y = NULL), alpha = 0.1, sides = "b") +
   facet_grid(loc_bin ~ type, scales = "free") +
-  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = status), level = 0.01, lwd = 0.7, span = 1) +
-scale_x_date(name = "List Date", date_labels = "%-m/%-d") +
+  geom_smooth(data = svt_fit, method = "loess", formula = y~x, aes(color = status), level = 0.01, lwd = 0.7, span = 1.5) +
+  scale_x_date(name = "List Date", date_labels = "%-m/%-d") +
   scale_color_manual(values = status_colors, name = "") +
-  scale_y_continuous(name = "$/Sq. Ft.") +
-  coord_cartesian(ylim = c(75, 550))
+  scale_y_continuous(name = "$/Sq. Ft.")
 
 suppressWarnings(print(sqft_plot))
 
