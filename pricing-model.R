@@ -124,7 +124,7 @@ complex_model_fig <- test_set %>%
   scale_x_continuous(name = "Asking Price", labels = scales::dollar) +
   scale_y_continuous(name = "Predicted Sale Price", labels = scales::dollar) +
   ggtitle("Complex Model", 
-          subtitle = paste0("R2 = ", round(cor(test_set$price, test_set$complex_prd)^2, 3)))
+          subtitle = paste0("AIC: ", round(AIC(complex_model))))
 
 dumb_model_fig <- test_set %>%
   ggplot(aes(x = price, y = dumb_prd)) +
@@ -134,14 +134,34 @@ dumb_model_fig <- test_set %>%
   scale_x_continuous(name = "Asking Price", labels = scales::dollar) +
   scale_y_continuous(name = NULL, labels = NULL) +
   ggtitle("Dumb Model", 
-          subtitle = paste0("R2 = ", round(cor(test_set$price, test_set$dumb_prd)^2, 3)))
+          subtitle = paste0("AIC: ", round(AIC(dumb_model))))
 
 
 model_figs <- complex_model_fig + dumb_model_fig
 model_figs
 
-# ggplot(data = complex_model$data, aes(x = price, y = resid(complex_model))) +
-#   geom_point(alpha = 0.1) +
-#   geom_smooth()
-
-
+# 
+# gower_dist <- test_set %>%
+#   mutate(per_sqft = price/sqft_mla) %>%
+#   select(per_sqft, city, bedrooms, bathrooms, sqft_mla, lot_size, agent, type, 
+#          building_style, parcel_size, building_age, heating, land_features, 
+#          water, sewer, foundation, basement, driveway, fuel_type, roof, garage,
+#          waterfront, rental_equipment, is_peninsula) %>%
+#   mutate_if(is.character, ~ as.factor(.)) %>%
+#   daisy(metric = "gower")
+# 
+# pam_fit <- pam(gower_dist, diss = TRUE, k = 4)
+# 
+# tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+# 
+# 
+# test_set <- mutate(test_set, cluster = pam_fit$clustering)
+# tsne_data <- tsne_obj$Y %>%
+#   data.frame() %>%
+#   setNames(c("X", "Y")) %>%
+#   mutate(cluster = factor(pam_fit$clustering),
+#          name = test_set$address)
+# 
+# ggplot(aes(x = X, y = Y), data = tsne_data) +
+#   geom_point(aes(color = cluster))
+# 

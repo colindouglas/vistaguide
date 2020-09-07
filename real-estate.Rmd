@@ -4,6 +4,7 @@ always_allow_html: true
 comments: false
 layout: page
 permalink: /real-estate/
+htmlwidgets: true
 output: 
   html_document:
     toc: true
@@ -15,8 +16,8 @@ output:
 knitr::opts_chunk$set(
     base.url = "/",
     echo = FALSE,
-    fig.path="img/",
-    cache.path = 'img/',
+    fig.path="real-estate/img/",
+    cache.path = 'real-estate/img/',
     screenshot.force = FALSE
   )
 
@@ -127,16 +128,30 @@ volume_plot_daily <- listings %>%
            status_type == "enter" ~ count,
            status_type == "exit" ~ -count
          )) %>%
+  arrange(status) %>%
   ggplot(aes(x = date, y = count)) +
   geom_col(aes(fill = status), na.rm = TRUE) +
   scale_fill_manual(values = status_colors, name = "") +
-  geom_text(data = volume_changes, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
-  geom_text(data = volume_changes, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
-  geom_line(data = volume_changes, aes(y = zoo::rollmean(net_change, 7, na.pad=TRUE, align = "right")), lty = 2, na.rm = TRUE) +
-  labs(x = "Date", y = "Change in Active Listings") +
-  scale_x_date(limits = c(Sys.Date() - days(31), Sys.Date() + days(1)))
+  scale_color_manual(values = darker_status_colors, name = "", guide = FALSE) +
+  geom_line(
+    aes(
+      y = zoo::rollmean(count, 14, na.pad = TRUE, align = "right"), 
+      color = status, group = status
+    ), 
+    lty = 1, 
+    na.rm = TRUE) +
+  labs(x = "Date", y = "Change in Active Listings")
 
-suppressWarnings(print(volume_plot_daily))
+#suppressWarnings(print(volume_plot_daily))
+
+```
+
+```{r Daily Entrance and Exit Volume, fig.width = 10, fig.height = 4}
+
+ggplotly(p = volume_plot_daily,
+         tooltip = c("y", "text")) %>%
+  layout(yaxis = list(fixedrange = TRUE)) %>%
+  config(displayModeBar = FALSE)
 
 ```
 
@@ -161,7 +176,7 @@ volume_changes_weekly <- listings_ts %>%
       TRUE ~ enter - exit),
     year_week = as_date(year_week))
   
-volume_plot_daily <- listings_ts %>%
+volume_plot_weekly <- listings_ts %>%
   mutate(status = as.character(status), 
          status_type = listing_type[status]) %>%
   filter(status != "Pending", !is.na(status_type)) %>%
@@ -170,23 +185,30 @@ volume_plot_daily <- listings_ts %>%
   summarize(count = n()) %>%
   mutate(status = as.character(status),
     status_type = listing_type[status],
-         count = case_when(
+         Count = case_when(
            status_type == "enter" ~ count,
            status_type == "exit" ~ -count
          )) %>%
   mutate(year_week = as_date(year_week)) %>%
-  ggplot(aes(x = year_week, y = count)) +
+  ggplot(aes(text = paste("Dates:", format(year_week, "%-m/%-d"), " - ", format(year_week + days(6), "%-m/%-d")),
+         x = year_week, 
+         y = Count)) +
   geom_col(aes(fill = status), na.rm = TRUE) +
   scale_fill_manual(values = status_colors, name = "") +
-  geom_text(data = volume_changes_weekly, aes(y = enter + max(enter) * 0.075, label = enter), size = 3) +
-  geom_text(data = volume_changes_weekly, aes(y = -(exit + max(exit) * 0.075), label = exit), size = 3) +
   geom_line(data = volume_changes_weekly, aes(y = net_change, group = 1), lty = 2, na.rm = TRUE) +
-  scale_x_date(name = "Week (Starting On)", date_labels = "%-m/%-d", date_breaks = "1 week") +
+  scale_x_date(name = "Week (Starting On)", date_labels = "%-m/%-d", date_breaks = "2 weeks") +
   labs(y = "Change in Active Listings")
 
-suppressWarnings(print(volume_plot_daily))
 
-#ggplotly(volume_plot_daily)
+```
+
+
+```{r Weekly trend of entry and exit volume, fig.width = 10, fig.height = 4}
+
+ggplotly(p = volume_plot_weekly,
+         tooltip = c("y", "text")) %>%
+  layout(yaxis = list(fixedrange = TRUE)) %>%
+  config(displayModeBar = FALSE)
 
 ```
 

@@ -55,6 +55,14 @@ for (file in files) {
       filter(!is.na(X1), !is.na(X2))
   )
   
+  # If there's no data, move along
+  if (!(nrow(tsv))) {
+    message(file, ": now rows of data...")
+    file.rename(file, paste0(filename, ".done"))
+    message(file, " >> ", filename, ".done")
+    next()
+  }
+  
   # Convert each row to chr
   rows <- map(1:nrow(tsv), ~ as.character(tsv[., ]))
   

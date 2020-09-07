@@ -21,5 +21,8 @@ status_colors <- c("For Sale" = "#3288bd", # Blue
                    "Defunct" = "#6a3d9a", # Purple
                    "Expired" = "darkgrey")
 
+darker_status_colors <- colorspace::darken(status_colors, amount = 0.5)
+names(darker_status_colors) <- names(status_colors)
+
 type_order <- c("Single Family", "Condominium", "Mobile", "Land", "Multiplex",  
                 "Cottage", "Commercial", "Industrial", "Other")
