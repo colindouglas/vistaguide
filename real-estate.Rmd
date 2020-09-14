@@ -17,6 +17,7 @@ knitr::opts_chunk$set(
     base.url = "/",
     echo = FALSE,
     fig.path="real-estate/img/",
+    fig.caption=FALSE,
     cache.path = 'real-estate/img/',
     screenshot.force = FALSE
   )
@@ -146,12 +147,13 @@ volume_plot_daily <- listings %>%
 
 ```
 
-```{r Daily Entrance and Exit Volume, fig.width = 10, fig.height = 4}
+```{r Daily Entrance and Exit Volume, fig.width = 10, fig.height = 4, warning = FALSE}
 
 ggplotly(p = volume_plot_daily,
          tooltip = c("y", "text")) %>%
   layout(yaxis = list(fixedrange = TRUE)) %>%
   config(displayModeBar = FALSE)
+
 
 ```
 
@@ -203,7 +205,7 @@ volume_plot_weekly <- listings_ts %>%
 ```
 
 
-```{r Weekly trend of entry and exit volume, fig.width = 10, fig.height = 4}
+```{r Weekly trend of entry and exit volume, fig.width = 10, fig.height = 4, warning = FALSE}
 
 ggplotly(p = volume_plot_weekly,
          tooltip = c("y", "text")) %>%
@@ -442,7 +444,7 @@ listings %>%
 These tables only list properties where their last event is being listed as "For Sale". They will disappear from this list once they've been listed as Pending or Sold.
 
 ```{r, Model setup, include=FALSE}
-source("pricing-model.R")
+source("pricing-model-tidy.R")
 rows_print <- 15
 
 print_listing_table <- function(df) {
@@ -453,7 +455,7 @@ print_listing_table <- function(df) {
       street = ifelse(is.na(unit), street, paste0(unit, "-", street)),
            address_link = cell_spec(street,"html", link = url),
            value_score = round(xsv_z * 100),
-           complex_prd = scales::dollar(complex_prd),
+           pred_price = scales::dollar(pred_price),
             price =  scales::dollar(price),
            loc_bin = str_trunc(case_when(
              postal_first %in% names(peninsula_codes) ~ peninsula_codes[postal_first],
@@ -462,7 +464,7 @@ print_listing_table <- function(df) {
     select(`Date` = scrape_date,
            Address = address_link,
            Location = loc_bin,
-           `Pred. Sale Price` = complex_prd,
+           `Pred. Sale Price` = pred_price,
            `Listing Price` = price,
            `Sq. Ft` = sqft_mla,
            `Value Score` = value_score) %>%
@@ -476,7 +478,7 @@ print_listing_table <- function(df) {
 
 The last 15 listings on the Halifax Peninsula by scrape date
 ```{r Listings on the Peninsula}
-test_set %>%
+for_sale_pred %>%
   arrange(desc(datetime)) %>%
   filter(loc_bin == "Halifax Peninsula" | loc_bin %in% peninsula_codes) %>%
   head(15) %>%
@@ -488,7 +490,7 @@ test_set %>%
 Top `r rows_print` properties that are either undervalued by the model, or terrible deals.
 
 ```{r Undervalued by Model}
-test_set %>%
+for_sale_pred %>%
   arrange(xsv_z) %>%
   filter(list_date > (today() - days(14))) %>%
   head(rows_print) %>%
@@ -499,7 +501,7 @@ test_set %>%
 Top `r rows_print` properties that are either overvalued by the model, or great deals!
 ```{r undervalued properties, rows.print = 10}
 
-test_set %>%
+for_sale_pred %>%
   arrange(-xsv_z) %>%
   filter(list_date > (today() - days(14))) %>%
   head(rows_print) %>%
@@ -509,7 +511,7 @@ test_set %>%
 ## Listings on Gladstone
 The listings on Gladstone St. in Halifax that are still active.
 ```{r Listings at on Gladstone}
-test_set %>%
+for_sale_pred %>%
   arrange(desc(datetime)) %>%
   filter(grepl("Gladstone", address)) %>%
   print_listing_table(.)
